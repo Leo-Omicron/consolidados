@@ -79,7 +79,13 @@
     // ========================================
     const profilingLogic = {
       parseHeaders: (headerRows, log) => {
-        const [rawAreas, rawAsignaturas, rawComponentes] = headerRows;
+        // Aseguramos que cada fila de encabezado tenga el mismo largo
+        const maxLen = Math.max(...headerRows.map(r => r.length));
+        const [rawAreas, rawAsignaturas, rawComponentes] = headerRows.map(row => {
+          const fullRow = [...row];
+          while (fullRow.length < maxLen) fullRow.push(undefined);
+          return fullRow;
+        });
         log.push({ level: 'info', message: `Filas de encabezado detectadas: ${headerRows.length}` });
 
         // 1. Forward fill en Áreas
@@ -114,14 +120,15 @@
         }));
         log.push({ level: 'info', message: `structuredHeaders before slice(2): ${JSON.stringify(structuredHeaders)}` });
 
-        structuredHeaders = structuredHeaders.slice(2); // <-- CORRECCIÓN CLAVE: Omitir las dos primeras columnas.
+        // Omitimos las dos primeras columnas (No, Estudiante)
+        structuredHeaders = structuredHeaders.slice(2);
         log.push({ level: 'info', message: `structuredHeaders after slice(2): ${JSON.stringify(structuredHeaders)}` });
-        
+
+        // Filtramos solo las cabeceras válidas
         structuredHeaders = structuredHeaders.filter(h => h.area && h.asignatura);
         log.push({ level: 'info', message: `structuredHeaders after filter: ${JSON.stringify(structuredHeaders)}` });
 
         log.push({ level: 'info', message: `Cabeceras estructuradas y normalizadas generadas.` });
-        
         return structuredHeaders;
       },
       getCountsFromSource: (headers) => {
