@@ -247,49 +247,61 @@
       globalProms.sort((a,b)=>b.prom-a.prom);
       const topGlobal = globalProms.slice(0,5);
 
+  // Top estudiantes con peor desempeño global (10)
+  const worstGlobal = globalProms.slice(-10).reverse();
+
+      // ...existing code...
       return (
         <div className="space-y-8">
           <h2 className="text-xl font-bold mb-4 text-blue-700">Consultas y Reportes Rápidos</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-blue-600">Promedios más bajos por Área</h3>
-              {lowAverages.map(a=>(
-                <div key={a.area} className="mb-3">
-                  <div className="font-bold text-sm mb-1">{a.area}</div>
-                  <ul className="text-xs">
-                    {a.students.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.prom.toFixed(2)}</span></li>))}
-                  </ul>
-                </div>
-              ))}
+              <div className="max-h-64 overflow-auto pr-2">
+                {lowAverages.map(a=>(
+                  <div key={a.area} className="mb-3">
+                    <div className="font-bold text-sm mb-1">{a.area}</div>
+                    <ul className="text-xs">
+                      {a.students.slice(0,10).map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.prom.toFixed(2)}</span></li>))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-red-600">Estudiantes con más Áreas Perdidas</h3>
               <ul className="text-xs">
-                {topLost.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.perdidas}</span> áreas</li>))}
+                {topLost.slice(0,10).map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.perdidas}</span> áreas</li>))}
               </ul>
             </div>
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-yellow-600">Estudiantes con más Áreas en Riesgo</h3>
               <ul className="text-xs">
-                {topRisk.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-yellow-600">{s.riesgo}</span> áreas</li>))}
+                {topRisk.slice(0,10).map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-yellow-600">{s.riesgo}</span> áreas</li>))}
               </ul>
             </div>
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-blue-600">Estudiantes con más Áreas Recuperables</h3>
               <ul className="text-xs">
-                {topRecup.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-blue-600">{s.recup}</span> áreas</li>))}
+                {topRecup.slice(0,10).map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-blue-600">{s.recup}</span> áreas</li>))}
               </ul>
             </div>
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-yellow-700">Áreas con más estudiantes en riesgo</h3>
               <ul className="text-xs">
-                {areaRisk.map(a=>(<li key={a.area}>{a.area}: <span className="font-semibold text-yellow-700">{a.riesgo}</span> estudiantes</li>))}
+                {areaRisk.slice(0,10).map(a=>(<li key={a.area}>{a.area}: <span className="font-semibold text-yellow-700">{a.riesgo}</span> estudiantes</li>))}
               </ul>
             </div>
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-green-700">Top estudiantes con mejor desempeño global</h3>
               <ul className="text-xs">
-                {topGlobal.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-green-700">{s.prom.toFixed(2)}</span></li>))}
+                {topGlobal.slice(0,10).map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-green-700">{s.prom.toFixed(2)}</span></li>))}
+              </ul>
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-red-700">Top estudiantes con peor desempeño global</h3>
+              <ul className="text-xs">
+                {worstGlobal.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-700">{s.prom.toFixed(2)}</span></li>))}
               </ul>
             </div>
           </div>
