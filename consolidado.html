@@ -636,6 +636,7 @@
       const [processed, setProcessed] = useState(null); // reporte intermedio
       const [analysisData, setAnalysisData] = useState(null);
       const [acceptChecks, setAcceptChecks] = useState({ defPropagation:false, singleArea:false, renderOK:false });
+      const [qualityLog, setQualityLog] = useState([]);
 
       const handleFileProcessed = (profile) => {
         const processingLog = [];
@@ -657,36 +658,41 @@
             studentCount: structuredData.structuredData.length
           }
         });
+        setQualityLog(processingLog.concat(structuredData.log));
         // Validaciones de aceptación tempranas
         setAcceptChecks(selfChecks(structuredData.structuredData));
-        setView('validation');
+        // Ir directamente al dashboard
+        const withCalcs = calculationLogic.performAllCalculations(structuredData.structuredData);
+        setAnalysisData(withCalcs);
+        setView('dashboard');
       };
 
       const handleLoadSample = () => handleFileProcessed(buildSampleProfile());
 
-      const handleReset = () => { setProcessed(null); setAnalysisData(null); setView('upload'); };
-      const handleValidationConfirm = () => {
-        const withCalcs = calculationLogic.performAllCalculations(processed.structuredData);
-        setAnalysisData(withCalcs);
-        setView('dashboard');
-      };
-      const handleReconciliationConfirm = () => {
-        const withCalcs = calculationLogic.performAllCalculations(processed.structuredData);
-        setAnalysisData(withCalcs);
-        setView('dashboard');
+      const handleReset = () => { setProcessed(null); setAnalysisData(null); setView('upload'); setQualityLog([]); };
+
+      // Botón para descargar el log de calidad
+      const downloadQualityLog = () => {
+        const blob = new Blob([JSON.stringify(qualityLog, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `log-calidad-${new Date().toISOString()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
       };
 
       return (
         <div>
           {view==='upload' && <UploadView onFileProcessed={handleFileProcessed} />}
-          {view==='validation' && <ValidationReportView report={{fileName: processed.fileName, qualityIssues: processed.log}} onReset={handleReset} onConfirm={handleValidationConfirm} />}
-          {view==='reconciliation' && <ReconciliationView report={processed} onBack={()=>setView('validation')} onConfirm={handleReconciliationConfirm} acceptChecks={acceptChecks} />}
-          {view==='dashboard' && <DashboardView data={analysisData} onReset={handleReset} fileName={processed.fileName} />}
-
-          <footer className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
-            <hr className="my-6"/>
-            <p><strong>Nota:</strong> Este archivo incluye dataset de prueba, validaciones automáticas, y correcciones al parser (propagación DEF, normalización de periodos y sanitización de notas). </p>
-          </footer>
+          {view==='dashboard' && <>
+            <DashboardView data={analysisData} onReset={handleReset} fileName={processed.fileName} />
+            <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
+              <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>
+              <hr className="my-6"/>
+              <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
+            </div>
+          </>}
         </div>
       );
     }
