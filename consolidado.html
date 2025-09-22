@@ -205,38 +205,38 @@
           prom: s.areas[area]?.areaStats?.promedioActual ?? null
         })).filter(s => typeof s.prom === 'number');
         students.sort((a,b) => a.prom-b.prom);
-        return { area, students: students.slice(0,5) };
+        return { area, students: students.slice(0,10) };
       });
 
-      // Estudiantes con más áreas perdidas
+      // Estudiantes con más áreas perdidas (top 10)
       const lostAreas = data.map(s => ({
         name: s.name,
         perdidas: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Perdido').length
       }));
       lostAreas.sort((a,b)=>b.perdidas-a.perdidas);
-      const topLost = lostAreas.filter(s=>s.perdidas>0).slice(0,5);
+      const topLost = lostAreas.filter(s=>s.perdidas>0).slice(0,10);
 
-      // Estudiantes con más áreas en riesgo
+      // Estudiantes con más áreas en riesgo (top 10)
       const riskAreas = data.map(s => ({
         name: s.name,
         riesgo: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='En riesgo').length
       }));
       riskAreas.sort((a,b)=>b.riesgo-a.riesgo);
-      const topRisk = riskAreas.filter(s=>s.riesgo>0).slice(0,5);
+      const topRisk = riskAreas.filter(s=>s.riesgo>0).slice(0,10);
 
-      // Estudiantes con más áreas recuperables
+      // Estudiantes con más áreas recuperables (top 10)
       const recupAreas = data.map(s => ({
         name: s.name,
         recup: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Recuperable').length
       }));
       recupAreas.sort((a,b)=>b.recup-a.recup);
-      const topRecup = recupAreas.filter(s=>s.recup>0).slice(0,5);
+      const topRecup = recupAreas.filter(s=>s.recup>0).slice(0,10);
 
-      // Áreas con más estudiantes en riesgo
+      // Áreas con más estudiantes en riesgo (top 10)
       const areaRisk = areaLabels.map(area => {
         const riesgo = data.filter(s => s.areas[area]?.areaStats?.estado?.text==='En riesgo').length;
         return { area, riesgo };
-      }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo).slice(0,5);
+      }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo).slice(0,10);
 
       // Top estudiantes con mejor desempeño global
       const globalProms = data.map(s => {
@@ -854,6 +854,9 @@
           <div className="bg-white border border-blue-200 rounded-xl p-5 mb-6 shadow flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <h2 className="text-xl font-bold mb-2 text-blue-700">Resumen Académico</h2>
+              {fileName && (
+                <div className="mb-2 text-xs text-gray-600">Archivo analizado: <span className="font-semibold text-blue-700">{fileName}</span></div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Promedio general de notas (áreas):</p>
