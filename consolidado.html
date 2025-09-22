@@ -232,7 +232,8 @@
         if (p4Min === null) return { text: 'N/A', color: 'gray' };
         if (p4Min >= 5.0) return { text: 'Perdido', color: 'red' };
         if (p4Min >= 4.0) return { text: 'En riesgo', color: 'yellow' };
-        if (p4Min >= 1.0) return { text: 'Recuperable', color: 'blue' };
+        if (p4Min >= 3.0) return { text: 'Recuperable', color: 'blue' };
+        if (p4Min >= 1.0) return { text: 'Ganable', color: 'cyan' };
         return { text: 'Ganado', color: 'green' };
       },
       calcPromYMin: (p1, p2, p3) => {
