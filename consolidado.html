@@ -457,11 +457,17 @@
     };
 
     const DashboardView = ({ data, onReset, fileName }) => {
-      const [selectedStudent, setSelectedStudent] = useState(data.length>0? 'Todos' : '');
-      const students = selectedStudent==='Todos' ? data : data.filter(s => s.name === selectedStudent);
+      // Filtros avanzados interactivos
+      const [studentFilter, setStudentFilter] = useState('');
+      const [areaFilter, setAreaFilter] = useState('');
+      const [asigFilter, setAsigFilter] = useState('');
+      const [estadoFilter, setEstadoFilter] = useState('');
 
-      // RowSpan total de asignaturas por estudiante
-      const rowSpanCount = (st) => Object.values(st.areas).reduce((acc,a) => acc + Object.keys(a.asignaturas).length, 0);
+      // Listas únicas para filtros desplegables
+      const studentList = Array.from(new Set(data.map(s => s.name)));
+      const areaList = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+      const asigList = Array.from(new Set(data.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas)))));
+      const estadoList = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
 
       // Función para resaltar filas críticas
       const getRowClass = (estado) => {
@@ -473,6 +479,57 @@
         if (estado.text === 'Ganado') return 'bg-green-50';
         return '';
       };
+
+      // Filtrado avanzado no destructivo: retorna filas completas
+      const filteredRowsAsignatura = [];
+      data.forEach(st => {
+        Object.entries(st.areas).forEach(([areaName, areaData]) => {
+          Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
+            // Criterios de filtro
+            const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
+            const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
+            const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
+            const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));
+            if (matchStudent && matchArea && matchAsig && matchEstado) {
+              filteredRowsAsignatura.push({
+                id: `${st.id}-${areaName}-${asigName}`,
+                estudiante: st.name,
+                area: areaName,
+                asignatura: asigName,
+                p1: asigData.P1,
+                p2: asigData.P2,
+                p3: asigData.P3,
+                promActual: asigData.promedioActual,
+                p4Min: asigData.p4Min,
+                estado: asigData.estado
+              });
+            }
+          });
+        });
+      });
+
+      // Filtrado avanzado no destructivo para área
+      const filteredRowsArea = [];
+      data.forEach(st => {
+        Object.entries(st.areas).forEach(([areaName, areaData]) => {
+          const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
+          const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
+          const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));
+          if (matchStudent && matchArea && matchEstado) {
+            filteredRowsArea.push({
+              id: `${st.id}-${areaName}`,
+              estudiante: st.name,
+              area: areaName,
+              defP1: areaData.DEF?.P1,
+              defP2: areaData.DEF?.P2,
+              defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual,
+              p4Min: areaData.areaStats?.p4Min,
+              estado: areaData.areaStats?.estado
+            });
+          }
+        });
+      });
 
       return (
         <div className="max-w-screen-xl mx-auto px-2 md:px-6 py-4 md:py-8 space-y-8">
@@ -486,12 +543,40 @@
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Filtrar por Estudiante</label>
-            <select className="mt-1 w-full md:w-1/3 border rounded-md p-2" value={selectedStudent} onChange={(e)=>setSelectedStudent(e.target.value)}>
-              <option>Todos</option>
-              {data.map(s => <option key={s.id}>{s.name}</option>)}
-            </select>
+          {/* Filtros avanzados */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Filtrar por Estudiante</label>
+              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estudiante..." value={studentFilter} onChange={e=>setStudentFilter(e.target.value)} />
+              <select className="mt-2 w-full border rounded-md p-2" value={studentFilter} onChange={e=>setStudentFilter(e.target.value)}>
+                <option value="">Todos</option>
+                {studentList.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Filtrar por Área</label>
+              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar área..." value={areaFilter} onChange={e=>setAreaFilter(e.target.value)} />
+              <select className="mt-2 w-full border rounded-md p-2" value={areaFilter} onChange={e=>setAreaFilter(e.target.value)}>
+                <option value="">Todas</option>
+                {areaList.map(a => <option key={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Filtrar por Asignatura</label>
+              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar asignatura..." value={asigFilter} onChange={e=>setAsigFilter(e.target.value)} />
+              <select className="mt-2 w-full border rounded-md p-2" value={asigFilter} onChange={e=>setAsigFilter(e.target.value)}>
+                <option value="">Todas</option>
+                {asigList.map(a => <option key={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700">Filtrar por Estado Académico</label>
+              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estado..." value={estadoFilter} onChange={e=>setEstadoFilter(e.target.value)} />
+              <select className="mt-2 w-full border rounded-md p-2" value={estadoFilter} onChange={e=>setEstadoFilter(e.target.value)}>
+                <option value="">Todos</option>
+                {estadoList.map(e => <option key={e}>{e}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
@@ -500,36 +585,30 @@
               <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Estudiante</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Asignatura</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">P1</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">P2</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">P3</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Promedio actual</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P1</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P2</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P3</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {students.map(st => (
-                    Object.entries(st.areas).flatMap(([areaName, areaData], areaIdx) => (
-                      Object.entries(areaData.asignaturas).map(([asigName, asigData], idx) => (
-                        <tr key={`${st.id}-${areaName}-${asigName}`} className={`hover:bg-gray-100 ${getRowClass(asigData.estado)}`}>
-                          {areaIdx===0 && idx===0 && (
-                            <td rowSpan={rowSpanCount(st)} className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10">{st.name}</td>
-                          )}
-                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{areaName}</td>
-                          <td className="px-3 py-3 text-sm text-gray-600">{asigName}</td>
-                          <td className="px-3 py-3 text-sm text-center">{asigData.P1?.toFixed(2) ?? '-'}</td>
-                          <td className="px-3 py-3 text-sm text-center">{asigData.P2?.toFixed(2) ?? '-'}</td>
-                          <td className="px-3 py-3 text-sm text-center">{asigData.P3?.toFixed(2) ?? '-'}</td>
-                          <td className="px-3 py-3 text-sm text-center font-semibold">{asigData.promedioActual?.toFixed(2) ?? 'N/A'}</td>
-                          <td className="px-3 py-3 text-sm text-center font-semibold">{asigData.p4Min?.toFixed(2) ?? 'N/A'}</td>
-                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={asigData.estado} /></td>
-                        </tr>
-                      ))
-                    ))
+                  {filteredRowsAsignatura.map(row => (
+                    <tr key={row.id} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+                      <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.p1 === 'number' ? row.p1.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.p2 === 'number' ? row.p2.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.p3 === 'number' ? row.p3.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
+                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                      <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -542,32 +621,28 @@
               <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Estudiante</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">DEF P1</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">DEF P2</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">DEF P3</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Promedio actual</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P1</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P2</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P3</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
                     <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {students.map(st => (
-                    Object.entries(st.areas).map(([areaName, areaData], idx) => (
-                      <tr key={`${st.id}-${areaName}`} className={`hover:bg-gray-100 ${getRowClass(areaData.areaStats?.estado)}`}>
-                        {idx===0 && (
-                          <td rowSpan={Object.keys(st.areas).length} className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10">{st.name}</td>
-                        )}
-                        <td className="px-3 py-3 text-sm font-medium text-gray-700">{areaName}</td>
-                        <td className="px-3 py-3 text-sm text-center">{areaData.DEF?.P1?.toFixed(2) ?? '-'}</td>
-                        <td className="px-3 py-3 text-sm text-center">{areaData.DEF?.P2?.toFixed(2) ?? '-'}</td>
-                        <td className="px-3 py-3 text-sm text-center">{areaData.DEF?.P3?.toFixed(2) ?? '-'}</td>
-                        <td className="px-3 py-3 text-sm text-center font-semibold">{areaData.areaStats?.promedioActual?.toFixed(2) ?? 'N/A'}</td>
-                        <td className="px-3 py-3 text-sm text-center font-semibold">{areaData.areaStats?.p4Min?.toFixed(2) ?? 'N/A'}</td>
-                        <td className="px-3 py-3 text-sm text-center"><StatusBadge status={areaData.areaStats?.estado ?? {text:'N/A', color:'gray'}} /></td>
-                      </tr>
-                    ))
+                  {filteredRowsArea.map(row => (
+                    <tr key={row.id} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                      <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP2 === 'number' ? row.defP2.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP3 === 'number' ? row.defP3.toFixed(2) : '-'}</td>
+                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
+                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                      <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
