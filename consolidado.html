@@ -169,7 +169,7 @@
     // Tabs para navegación (Análisis / Gráficos)
     // =============================
     function DashboardTabs({ dashboardData, onReset, fileName }) {
-      const [tab, setTab] = useState('analisis');
+  const [tab, setTab] = useState('analisis');
       return (
         <div className="w-full">
           <div className="flex gap-2 mb-4">
@@ -181,12 +181,121 @@
               className={tab==='graficos' ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow' : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'} 
               onClick={()=>setTab('graficos')}
             >Gráficos</button>
+            <button 
+              className={tab==='consultas' ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow' : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'} 
+              onClick={()=>setTab('consultas')}
+            >Consultas/Reportes Rápidos</button>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            {tab==='analisis' ? <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} /> : <DashboardCharts data={dashboardData} />}
+            {tab==='analisis' ? <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} /> :
+             tab==='graficos' ? <DashboardCharts data={dashboardData} /> :
+             tab==='consultas' ? <QuickReportsView data={dashboardData} /> : null}
           </div>
         </div>
       );
+    // =============================
+    // Componente Consultas/Reportes Rápidos
+    // =============================
+    function QuickReportsView({ data }) {
+      // Promedios más bajos por área
+      const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+      const lowAverages = areaLabels.map(area => {
+        const students = data.map(s => ({
+          name: s.name,
+          prom: s.areas[area]?.areaStats?.promedioActual ?? null
+        })).filter(s => typeof s.prom === 'number');
+        students.sort((a,b) => a.prom-b.prom);
+        return { area, students: students.slice(0,5) };
+      });
+
+      // Estudiantes con más áreas perdidas
+      const lostAreas = data.map(s => ({
+        name: s.name,
+        perdidas: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Perdido').length
+      }));
+      lostAreas.sort((a,b)=>b.perdidas-a.perdidas);
+      const topLost = lostAreas.filter(s=>s.perdidas>0).slice(0,5);
+
+      // Estudiantes con más áreas en riesgo
+      const riskAreas = data.map(s => ({
+        name: s.name,
+        riesgo: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='En riesgo').length
+      }));
+      riskAreas.sort((a,b)=>b.riesgo-a.riesgo);
+      const topRisk = riskAreas.filter(s=>s.riesgo>0).slice(0,5);
+
+      // Estudiantes con más áreas recuperables
+      const recupAreas = data.map(s => ({
+        name: s.name,
+        recup: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Recuperable').length
+      }));
+      recupAreas.sort((a,b)=>b.recup-a.recup);
+      const topRecup = recupAreas.filter(s=>s.recup>0).slice(0,5);
+
+      // Áreas con más estudiantes en riesgo
+      const areaRisk = areaLabels.map(area => {
+        const riesgo = data.filter(s => s.areas[area]?.areaStats?.estado?.text==='En riesgo').length;
+        return { area, riesgo };
+      }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo).slice(0,5);
+
+      // Top estudiantes con mejor desempeño global
+      const globalProms = data.map(s => {
+        const proms = Object.values(s.areas).map(a => a.areaStats?.promedioActual).filter(v=>typeof v==='number');
+        const prom = proms.length ? proms.reduce((a,b)=>a+b,0)/proms.length : null;
+        return { name: s.name, prom };
+      }).filter(s=>typeof s.prom==='number');
+      globalProms.sort((a,b)=>b.prom-a.prom);
+      const topGlobal = globalProms.slice(0,5);
+
+      return (
+        <div className="space-y-8">
+          <h2 className="text-xl font-bold mb-4 text-blue-700">Consultas y Reportes Rápidos</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-blue-600">Promedios más bajos por Área</h3>
+              {lowAverages.map(a=>(
+                <div key={a.area} className="mb-3">
+                  <div className="font-bold text-sm mb-1">{a.area}</div>
+                  <ul className="text-xs">
+                    {a.students.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.prom.toFixed(2)}</span></li>))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-red-600">Estudiantes con más Áreas Perdidas</h3>
+              <ul className="text-xs">
+                {topLost.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-red-600">{s.perdidas}</span> áreas</li>))}
+              </ul>
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-yellow-600">Estudiantes con más Áreas en Riesgo</h3>
+              <ul className="text-xs">
+                {topRisk.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-yellow-600">{s.riesgo}</span> áreas</li>))}
+              </ul>
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-blue-600">Estudiantes con más Áreas Recuperables</h3>
+              <ul className="text-xs">
+                {topRecup.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-blue-600">{s.recup}</span> áreas</li>))}
+              </ul>
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-yellow-700">Áreas con más estudiantes en riesgo</h3>
+              <ul className="text-xs">
+                {areaRisk.map(a=>(<li key={a.area}>{a.area}: <span className="font-semibold text-yellow-700">{a.riesgo}</span> estudiantes</li>))}
+              </ul>
+            </div>
+            <div className="bg-white border rounded-xl p-4 shadow">
+              <h3 className="font-semibold mb-2 text-green-700">Top estudiantes con mejor desempeño global</h3>
+              <ul className="text-xs">
+                {topGlobal.map(s=>(<li key={s.name}>{s.name}: <span className="font-semibold text-green-700">{s.prom.toFixed(2)}</span></li>))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
     }
     // ...resto del código React...
   </script>
