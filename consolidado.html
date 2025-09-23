@@ -172,15 +172,31 @@
   const [tab, setTab] = useState('analisis');
       return (
         <div className="w-full">
-          <div className="flex gap-2 mb-4">
-            <button 
-              className={tab==='analisis' ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow' : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'} 
-              onClick={()=>setTab('analisis')}
-            >Análisis</button>
-            <button 
-              className={tab==='graficos' ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow' : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'} 
-              onClick={()=>setTab('graficos')}
-            >Gráficos</button>
+          <div role="tablist" aria-label="Navegación del dashboard" className="flex gap-2 mb-4">
+            <button
+          role="tab"
+          id="tab-analisis"
+          aria-controls="panel-analisis"
+          aria-selected={tab === 'analisis'}
+          className={tab === 'analisis'
+            ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
+            : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
+          onClick={() => setTab('analisis')}
+        >
+          Análisis
+        </button>
+            <button
+          role="tab"
+          id="tab-graficos"
+          aria-controls="panel-graficos"
+          aria-selected={tab === 'graficos'}
+          className={tab === 'graficos'
+            ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
+            : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
+          onClick={() => setTab('graficos')}
+        >
+          Gráficos
+        </button>
             <button 
               className={tab==='consultas' ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow' : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'} 
               onClick={()=>setTab('consultas')}
@@ -193,6 +209,7 @@
           </div>
         </div>
       );
+    }
     // =============================
     // Componente Consultas/Reportes Rápidos
     // =============================
@@ -320,7 +337,6 @@
           </div>
         </div>
       );
-    }
     }
     // ...resto del código React...
   </script>
@@ -627,7 +643,7 @@
 
             const headerRows = data.slice(0, 3).map(row => {
                 const fullRow = [...row];
-                while (fullRow.length <= data[0].length) { // Use data[0].length for max_col
+                while (fullRow.length < data[0].length) { // Use data[0].length for max_col
                     fullRow.push(undefined);
                 }
                 return fullRow;
