@@ -1234,17 +1234,111 @@
     // (8) App principal
     // ======================================
     function App(){
-      const [view, setView] = useState('upload');
-      const [processed, setProcessed] = useState(null); // reporte intermedio
-      const [analysisData, setAnalysisData] = useState(null);
+      // --- Inicialización perezosa desde localStorage ---
+      const initialCourses = (() => {
+        try {
+          const raw = localStorage.getItem('coursesSnapshot');
+          return raw ? JSON.parse(raw) : [];
+        } catch { return []; }
+      })();
+
+      const initialSelectedCourse = (() => {
+        try { return localStorage.getItem('selectedCourse') || null; }
+        catch { return null; }
+      })();
+
+      const initialAnalysisData = (() => {
+        try {
+          if (!Array.isArray(initialCourses) || initialCourses.length === 0) return null;
+          const sel = (initialSelectedCourse && initialSelectedCourse !== 'ALL') ? initialSelectedCourse : 'ALL';
+          if (sel === 'ALL') return initialCourses.flatMap(c => c.data);
+          const found = initialCourses.find(c => c.name === sel);
+          return found ? found.data : initialCourses[0].data;
+        } catch { return null; }
+      })();
+
+      const initialView = (Array.isArray(initialCourses) && initialCourses.length > 0) ? 'dashboard' : 'upload';
+      const initialProcessed = (Array.isArray(initialCourses) && initialCourses.length > 0)
+        ? { fileName: (initialSelectedCourse && initialSelectedCourse !== 'ALL') ? `${initialSelectedCourse} (recuperado)` : 'Todos (recuperado)' }
+        : null;
+
+      // --- Estados (reemplazar los useState previos de estos cinco) ---
+      const [courses, setCourses] = useState(initialCourses);
+      const [selectedCourse, setSelectedCourse] = useState(
+        initialSelectedCourse || (initialCourses.length ? 'ALL' : null)
+      );
+      const [analysisData, setAnalysisData] = useState(initialAnalysisData);
+      const [view, setView] = useState(initialView);
+      const [processed, setProcessed] = useState(initialProcessed);
       const [acceptChecks, setAcceptChecks] = useState({ defPropagation:false, singleArea:false, renderOK:false });
       const [qualityLog, setQualityLog] = useState([]);
-
-      // --- Estados para manejar varios cursos (1 archivo = 1 curso) ---
-      const [courses, setCourses] = useState([]); // [{ name: string, data: any[] }]
-      const [selectedCourse, setSelectedCourse] = useState(null); // string | 'ALL'
       const addInputRef = useRef(null);
       const courseNameFrom = (name) => String(name || '').replace(/\.(xlsx|xls|csv)$/i, '');
+
+      // Persistir selección de curso en localStorage
+      useEffect(() => {
+        if (selectedCourse != null) {
+          try { localStorage.setItem('selectedCourse', String(selectedCourse)); } catch {}
+        }
+      }, [selectedCourse]);
+
+      // Restaurar selección de curso cuando haya cursos disponibles
+      useEffect(() => {
+        try {
+          const saved = localStorage.getItem('selectedCourse');
+          if (!saved) return;
+          if (saved === 'ALL') {
+            setSelectedCourse('ALL');
+          } else if (Array.isArray(courses) && courses.some(c => c.name === saved)) {
+            setSelectedCourse(saved);
+          }
+        } catch {}
+        // Solo interesa reaccionar a cambios en la cantidad de cursos
+      }, [courses.length]);
+
+      // Persistir lista de cursos en localStorage
+      useEffect(() => {
+        try {
+          if (Array.isArray(courses) && courses.length > 0) {
+            localStorage.setItem('coursesSnapshot', JSON.stringify(courses));
+          } else {
+            localStorage.removeItem('coursesSnapshot');
+          }
+        } catch (e) {
+          console.error('Persist courses error:', e);
+        }
+      }, [courses]);
+
+      // Restaurar cursos/selección y abrir dashboard si hay snapshot
+      useEffect(() => {
+        try {
+          const raw = localStorage.getItem('coursesSnapshot');
+          if (!raw) return;
+          const savedCourses = JSON.parse(raw);
+          if (!Array.isArray(savedCourses) || savedCourses.length === 0) return;
+
+          setCourses(savedCourses);
+
+          const savedSelected = localStorage.getItem('selectedCourse') || 'ALL';
+          setSelectedCourse(savedSelected);
+
+          // Determinar el dataset por defecto para analysisData
+          const defaultData =
+            (savedSelected && savedSelected !== 'ALL')
+              ? (savedCourses.find(c => c.name === savedSelected)?.data || savedCourses[0].data)
+              : savedCourses.flatMap(c => c.data);
+
+          setAnalysisData(defaultData);
+
+          // Asegurar un fileName visible en el dashboard
+          setProcessed(prev => prev ?? { fileName: (savedSelected === 'ALL' ? 'Todos (recuperado)' : `${savedSelected} (recuperado)`) });
+
+          // Ir directo al dashboard
+          setView('dashboard');
+        } catch (e) {
+          console.error('Restore courses error:', e);
+        }
+      }, []);
 
 
       const handleFileProcessed = (profile) => {
