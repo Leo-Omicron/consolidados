@@ -12,6 +12,104 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Flag persistente para silenciar errores externos en DEV
+    (function () {
+      const KEY = 'suppressExternalErrors';
+      if (localStorage.getItem(KEY) == null) {
+        localStorage.setItem(KEY, 'true'); // por defecto ON
+      }
+      window.__SUPPRESS_EXTERNAL_CONSOLE_NOISE__ = localStorage.getItem(KEY) === 'true';
+
+      // Helper para cambiar y persistir
+      window.__setSuppressExternalErrors = (on) => {
+        localStorage.setItem(KEY, on ? 'true' : 'false');
+        window.__SUPPRESS_EXTERNAL_CONSOLE_NOISE__ = !!on;
+      };
+    })();
+  </script>
+  <script>
+    // ===============================
+    // DEV: Filtro de ruido de extensiones externas
+    // - Filtra errores con source 'chrome-extension://', 'rc2Contentscript.js'
+    // - Filtra 'Unchecked runtime.lastError', 'message port closed...'
+    // - Captura: window.onerror, error event (capture), unhandledrejection,
+    //   console.error y console.warn.
+    // No afecta la lógica del dashboard.
+    // ===============================
+    (function () {
+      const isEnabled = () => !!window.__SUPPRESS_EXTERNAL_CONSOLE_NOISE__;
+      const extSrc = (src) => typeof src === 'string' && (
+        src.startsWith('chrome-extension://') || /rc2Contentscript\.js/i.test(src)
+      );
+      const msgHit = (msg) => {
+        const s = String(msg || '');
+        return /Unchecked runtime\.lastError/i.test(s)
+            || /message port closed/i.test(s)
+            || /rc2Contentscript\.js/i.test(s);
+      };
+
+      // 1) window.onerror (legacy)
+      const originalOnError = window.onerror;
+      window.onerror = function (message, source, lineno, colno, error) {
+        try {
+          if (isEnabled() && (extSrc(source) || msgHit(message))) {
+            return true; // silenciado
+          }
+        } catch (_) {}
+        return typeof originalOnError === 'function'
+          ? originalOnError.apply(this, arguments)
+          : false;
+      };
+
+      // 2) Captura en fase 'capture' de eventos 'error'
+      window.addEventListener('error', function (ev) {
+        try {
+          const src = ev?.filename || ev?.target?.src || '';
+          const msg = ev?.message || '';
+          if (isEnabled() && (extSrc(src) || msgHit(msg))) {
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+          }
+        } catch (_) {}
+      }, true);
+
+      // 3) Promesas no manejadas
+      window.addEventListener('unhandledrejection', function (ev) {
+        try {
+          const reason = ev?.reason;
+          const text = reason && reason.message ? String(reason.message) : String(reason || '');
+          if (isEnabled() && msgHit(text)) {
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+          }
+        } catch (_) {}
+      }, true);
+
+      // 4) console.error / console.warn
+      const originalConsoleError = console.error;
+      console.error = function () {
+        try {
+          const text = Array.from(arguments).map(a => (a && a.stack) ? a.stack : String(a)).join(' ');
+          if (isEnabled() && (msgHit(text) || /chrome-extension:\/\//i.test(text))) {
+            return;
+          }
+        } catch (_) {}
+        return originalConsoleError.apply(console, arguments);
+      };
+
+      const originalConsoleWarn = console.warn;
+      console.warn = function () {
+        try {
+          const text = Array.from(arguments).map(a => String(a)).join(' ');
+          if (isEnabled() && (msgHit(text) || /chrome-extension:\/\//i.test(text))) {
+            return;
+          }
+        } catch (_) {}
+        return originalConsoleWarn.apply(console, arguments);
+      };
+    })();
+  </script>
   <script type="text/babel">
     // ...existing imports and code...
 
@@ -652,6 +750,49 @@
     };
 
     // ======================================
+    // (6.1) Importador multi-hojas por archivo
+    // ======================================
+    const makeCourseName = (fileBase, sheetName) => {
+      const s = String(sheetName || '').trim();
+      return s ? `${fileBase} - ${s}` : fileBase;
+    };
+
+    const ensureUniqueName = (existingCourses, desired) => {
+      const exists = (name) => existingCourses.some(c => c.name === name);
+      if (!exists(desired)) return desired;
+      let i = 2;
+      while (exists(`${desired} (${i})`)) i++;
+      return `${desired} (${i})`;
+    };
+
+    const importWorkbookToProfiles = (wb, fileName) => {
+      const out = [];
+      const fileBase = String(fileName || '').replace(/\.(xlsx|xls|csv)$/i, '');
+      (wb.SheetNames || []).forEach((sheetName) => {
+        try {
+          const ws = wb.Sheets[sheetName];
+          if (!ws) return;
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+          if (!data || data.length < 4) return; // 3 header rows + data
+
+          // Normalizar las 3 filas de encabezados al mismo largo
+          const maxCols = Math.max(...data.slice(0,3).map(r => r.length));
+          const headerRows = data.slice(0,3).map(row => {
+            const full = [...row];
+            while (full.length < maxCols) full.push(undefined);
+            return full;
+          });
+          const tableData = data.slice(3);
+
+          out.push({ fileName, sheetName, headerRows, tableData, courseBase: fileBase });
+        } catch (e) {
+          console.warn('Hoja omitida por error:', sheetName, e);
+        }
+      });
+      return out;
+    };
+
+    // ======================================
     // (6) Componentes de Interfaz
     // ======================================
     const StatusBadge = ({ status }) => {
@@ -673,49 +814,40 @@
       }[status.color] || null;
       return <span className={`px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${color}`}>{icon}{status.text}</span>;
     };
-
-    const UploadView = ({ onFileProcessed }) => {
+    
+    const UploadView = ({ onWorkbookProcessed }) => {
       const [files, setFiles] = useState([]);
       const [isDragging, setIsDragging] = useState(false);
       const inputRef = useRef(null);
-
-      const processFile = (file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-            if (wb.SheetNames.length === 0) return resolve({ status: 'error', message: 'El archivo no contiene hojas.' });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-            if (data.length < 4) return resolve({ status: 'error', message: 'Se requieren al menos 3 filas de encabezado + datos.' });
-
-            const headerRows = data.slice(0, 3).map(row => {
-                const fullRow = [...row];
-                while (fullRow.length < data[0].length) { // Use data[0].length for max_col
-                    fullRow.push(undefined);
-                }
-                return fullRow;
-            });
-            const dataRows = data.slice(3);
-
-            resolve({ status: 'success', profile: { fileName: file.name, headerRows, tableData: dataRows } });
-          } catch (err) {
-            resolve({ status: 'error', message: 'No se pudo leer el archivo. ¿Está corrupto?' });
-          }
-        };
-        reader.onerror = () => resolve({ status: 'error', message: 'Error al leer el archivo.' });
-        reader.readAsArrayBuffer(file);
-      });
 
       const handleSelected = async (flist) => {
         if (!flist || flist.length === 0) return;
         const f = flist[0];
         const token = `${f.name}-${f.lastModified}`;
-        setFiles([{ id: token, name: f.name, status: 'processing', message: 'Analizando estructura…' }]);
-        const res = await processFile(f);
-        if (res.status === 'success') onFileProcessed(res.profile);
-        else setFiles([{ id: token, name: f.name, status: 'error', message: res.message }]);
-        if (inputRef.current) inputRef.current.value = '';
+        setFiles([{ id: token, name: f.name, status: 'processing', message: 'Analizando hojas…' }]);
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            if (!wb.SheetNames || wb.SheetNames.length === 0) {
+              setFiles([{ id: token, name: f.name, status: 'error', message: 'El archivo no contiene hojas.' }]);
+              return;
+            }
+            const profiles = importWorkbookToProfiles(wb, f.name);
+            if (profiles.length === 0) {
+              setFiles([{ id: token, name: f.name, status: 'error', message: 'Estructura inválida: se requieren 3 encabezados + datos.' }]);
+              return;
+            }
+            onWorkbookProcessed(profiles);
+          } catch (err) {
+            setFiles([{ id: token, name: f.name, status: 'error', message: 'No se pudo leer el archivo.' }]);
+          } finally {
+            if (inputRef.current) inputRef.current.value = '';
+          }
+        };
+        reader.onerror = () => setFiles([{ id: token, name: f.name, status: 'error', message: 'Error al leer el archivo.' }]);
+        reader.readAsArrayBuffer(f);
       };
 
       const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); handleSelected(e.dataTransfer.files); };
@@ -725,7 +857,7 @@
         <div className="min-h-screen flex flex-col items-center justify-center p-6">
           <div className="w-full max-w-3xl">
             <h1 className="text-3xl font-bold text-center">Dashboard Académico</h1>
-            <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas.</p>
+            <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
 
             <div onDrop={handleDrop} onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag}
                  className={`relative flex flex-col items-center justify-center w-full p-10 border-2 border-dashed rounded-xl cursor-pointer transition ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`} onClick={() => inputRef.current.click()}>
@@ -734,7 +866,11 @@
               <p className="text-sm text-gray-500">o</p>
               <button type="button" className="mt-2 inline-flex items-center px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Seleccionar archivo</button>
               <input ref={inputRef} type="file" className="hidden" onChange={(e)=>handleSelected(e.target.files)} accept=".xlsx,.xls,.csv" />
-              <p className="text-xs text-gray-500 mt-2">Formatos: .xlsx, .xls, .csv</p>
+              <p className="text-xs text-gray-500 mt-2">Cada hoja se importará como curso.</p>
+              <p className="text-xs text-gray-500 mt-2">
+                ¿Ves errores como <code>rc2Contentscript.js</code> o <code>Unchecked runtime.lastError</code>? 
+                Son de extensiones del navegador. Usa el toggle “Silenciar errores externos” en el Dashboard o prueba en modo incógnito.
+              </p>
             </div>
           </div>
         </div>
@@ -1238,8 +1374,19 @@
       const initialCourses = (() => {
         try {
           const raw = localStorage.getItem('coursesSnapshot');
-          return raw ? JSON.parse(raw) : [];
-        } catch { return []; }
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          const arr = Array.isArray(parsed) ? parsed : [];
+          // Deduplica por nombre exacto
+          const deduped = (() => {
+            const m = new Map();
+            arr.forEach(c => m.set(c.name, c));
+            return Array.from(m.values());
+          })();
+          return deduped;
+        } catch {
+          return [];
+        }
       })();
 
       const initialSelectedCourse = (() => {
@@ -1274,6 +1421,82 @@
       const [qualityLog, setQualityLog] = useState([]);
       const addInputRef = useRef(null);
       const courseNameFrom = (name) => String(name || '').replace(/\.(xlsx|xls|csv)$/i, '');
+
+      // ---------- Utilidades de estado/persistencia ----------
+      const persistCourses = (arr) => {
+        if (Array.isArray(arr) && arr.length > 0) {
+          try { localStorage.setItem('coursesSnapshot', JSON.stringify(arr)); } catch {}
+        } else {
+          try { localStorage.removeItem('coursesSnapshot'); } catch {}
+        }
+      };
+
+      const persistSelected = (value) => {
+        if (value) {
+          try { localStorage.setItem('selectedCourse', String(value)); } catch {}
+        } else {
+          try { localStorage.removeItem('selectedCourse'); } catch {}
+        }
+      };
+
+      // Elimina un curso por nombre; reacomoda selección/datos y persiste
+      const removeCourseByName = (name) => {
+        setCourses((prev) => {
+          const next = prev.filter(c => c.name !== name);
+          persistCourses(next);
+
+          // Recalcular selección
+          setSelectedCourse((selPrev) => {
+            let sel = selPrev;
+            if (selPrev === name) {
+              if (next.length === 0) sel = null;
+              else if (next.length === 1) sel = next[0].name;
+              else sel = 'ALL';
+            }
+            persistSelected(sel);
+            // Recalcular analysisData según selección final
+            if (sel === null) {
+              setAnalysisData(null);
+              setProcessed(null);
+              setView('upload');
+            } else if (sel === 'ALL') {
+              setAnalysisData(next.flatMap(c => c.data));
+            } else {
+              const found = next.find(c => c.name === sel);
+              setAnalysisData(found ? found.data : (next[0]?.data ?? null));
+            }
+            return sel;
+          });
+
+          // Si ya no quedan cursos, limpiar otros estados auxiliares
+          if (next.length === 0) {
+            setAcceptChecks({ defPropagation:false, singleArea:false, renderOK:false });
+            setQualityLog([]);
+          }
+          return next;
+        });
+      };
+
+      // Limpia absolutamente todo lo persistido y vuelve a la vista de carga
+      const clearAllData = () => {
+        if (!confirm('¿Vaciar toda la memoria (cursos/notas)? Esta acción no se puede deshacer.')) return;
+        try { localStorage.removeItem('coursesSnapshot'); } catch {}
+        try { localStorage.removeItem('selectedCourse'); } catch {}
+        setCourses([]);
+        setSelectedCourse(null);
+        setAnalysisData(null);
+        setProcessed(null);
+        setAcceptChecks({ defPropagation:false, singleArea:false, renderOK:false });
+        setQualityLog([]);
+        setView('upload');
+      };
+
+      // (Opcional) Deduplicador por nombre exacto; conserva el último
+      const dedupeCourses = (arr) => {
+        const map = new Map();
+        arr.forEach(c => map.set(c.name, c));
+        return Array.from(map.values());
+      };
 
       // Persistir selección de curso en localStorage
       useEffect(() => {
@@ -1340,42 +1563,68 @@
         }
       }, []);
 
+      const handleWorkbookProcessed = (profiles) => {
+        if (!Array.isArray(profiles) || profiles.length === 0) return;
 
-      const handleFileProcessed = (profile) => {
         const processingLog = [];
-        // profile.headerRows will be the raw header rows from the Excel file
-        const parsedHeaders = profilingLogic.parseHeaders(profile.headerRows, processingLog);
-        const structuredData = cleaningLogic.structureData({ ...profile, tableHeaders: parsedHeaders }, processingLog);
-        const sourceCounts = profilingLogic.getCountsFromSource(parsedHeaders);
-        const pAreas = new Set(structuredData.structuredData.flatMap(s => Object.keys(s.areas)));
-        const pAsigs = new Set(structuredData.structuredData.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas))));
+        const newCourses = [];
 
-        setProcessed({
-          fileName: profile.fileName,
-          log: processingLog.concat(structuredData.log),
-          structuredData: structuredData.structuredData,
-          sourceCounts,
-          processedCounts: {
-            areaCount: pAreas.size,
-            asignaturaCount: pAsigs.size,
-            studentCount: structuredData.structuredData.length
-          }
+        profiles.forEach((profile) => {
+          const parsedHeaders = profilingLogic.parseHeaders(profile.headerRows, processingLog);
+          const structuredData = cleaningLogic.structureData({ ...profile, tableHeaders: parsedHeaders }, processingLog);
+          const withCalcs = calculationLogic.performAllCalculations(structuredData.structuredData);
+
+          const desired = makeCourseName(profile.courseBase, profile.sheetName);
+          const finalName = ensureUniqueName([...courses, ...newCourses], desired);
+          newCourses.push({ name: finalName, data: withCalcs });
         });
-        setQualityLog(processingLog.concat(structuredData.log));
-        // Validaciones de aceptación tempranas
-        setAcceptChecks(selfChecks(structuredData.structuredData));
-        // Ir directamente al dashboard + inicializar cursos
-        const withCalcs = calculationLogic.performAllCalculations(structuredData.structuredData);
-        const cname = courseNameFrom(profile.fileName);
-        setCourses([{ name: cname, data: withCalcs }]);
-        setSelectedCourse(cname);
-        setAnalysisData(withCalcs);
+
+        // Fusionar con cursos existentes (reemplaza por nombre si coincide)
+        const mergedCourses = (() => {
+          const map = new Map(courses.map(c => [c.name, c]));
+          newCourses.forEach(nc => map.set(nc.name, nc));
+          return Array.from(map.values());
+        })();
+
+        setCourses(mergedCourses);
+
+        // Selección por defecto: ALL si hay más de un curso, si no el único
+        const nextSelected = mergedCourses.length > 1 ? 'ALL' : mergedCourses[0].name;
+        setSelectedCourse(nextSelected);
+
+        const nextData = nextSelected === 'ALL'
+          ? mergedCourses.flatMap(c => c.data)
+          : mergedCourses[0].data;
+
+        setAnalysisData(nextData);
+        setAcceptChecks(selfChecks(mergedCourses[0].data));
+        setProcessed({
+          fileName: `${profiles[0].fileName} (${profiles.length} hoja${profiles.length>1?'s':''})`,
+          log: processingLog,
+          structuredData: null,
+          sourceCounts: { areaCount: 0, asignaturaCount: 0 },
+          processedCounts: { areaCount: 0, asignaturaCount: 0, studentCount: 0 }
+        });
         setView('dashboard');
       };
 
-      const handleLoadSample = () => handleFileProcessed(buildSampleProfile());
-
       const handleReset = () => { setProcessed(null); setAnalysisData(null); setView('upload'); setQualityLog([]); };
+
+      // Eliminar el curso actualmente seleccionado (si no es ALL)
+      const handleDeleteCurrentCourse = () => {
+        if (!selectedCourse || selectedCourse === 'ALL') {
+          alert('Selecciona un curso específico para eliminar.');
+          return;
+        }
+        if (confirm(`¿Eliminar el curso "${selectedCourse}"?`)) {
+          removeCourseByName(selectedCourse);
+        }
+      };
+
+      // Vaciar memoria sin tocar archivos locales
+      const handleClearMemory = () => {
+        clearAllData();
+      };
 
       // Botón para descargar el log de calidad
       const downloadQualityLog = () => {
@@ -1390,7 +1639,7 @@
 
       return (
         <div>
-          {view==='upload' && <UploadView onFileProcessed={handleFileProcessed} />}
+          {view==='upload' && <UploadView onWorkbookProcessed={handleWorkbookProcessed} />}
           {view==='dashboard' && <>
             {/* Selector de curso y botón Agregar */}
             <div className="max-w-7xl mx-auto px-6 mt-6 mb-2 flex flex-wrap items-center gap-3">
@@ -1414,6 +1663,43 @@
                 Agregar curso
               </button>
 
+              {/* Acciones de mantenimiento */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center px-3 py-1.5 rounded-md text-white bg-red-600 hover:bg-red-700 text-sm disabled:opacity-50"
+                  onClick={handleDeleteCurrentCourse}
+                  disabled={!selectedCourse || selectedCourse === 'ALL'}
+                  title="Eliminar solo el curso seleccionado"
+                >
+                  Eliminar curso
+                </button>
+
+                <button
+                  type="button"
+                  className="inline-flex items-center px-3 py-1.5 rounded-md text-white bg-zinc-800 hover:bg-black text-sm"
+                  onClick={handleClearMemory}
+                  title="Vaciar toda la memoria (cursos y selección)"
+                >
+                  Vaciar memoria
+                </button>
+
+                {/* Toggle: Silenciar errores externos */}
+                <label className="inline-flex items-center gap-2 text-sm ml-2" title="Silenciar errores externos del navegador (extensiones)">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    defaultChecked={window.__SUPPRESS_EXTERNAL_CONSOLE_NOISE__}
+                    onChange={(e) => {
+                      window.__setSuppressExternalErrors(e.target.checked);
+                      // Feedback visual mínimo
+                      alert(e.target.checked ? 'Silencio de errores externos: ACTIVADO' : 'Silencio de errores externos: DESACTIVADO');
+                    }}
+                  />
+                  Silenciar errores externos
+                </label>
+              </div>
+
               <input
                 ref={addInputRef}
                 type="file"
@@ -1427,27 +1713,10 @@
                     reader.onload = () => {
                       try {
                         const wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
-                        if (!wb.SheetNames || wb.SheetNames.length === 0) return;
-                        const ws = wb.Sheets[wb.SheetNames[0]];
-                        const data = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
-                        if (!data || data.length < 4) return;
-
-                        const headerRows = data.slice(0, 3);
-                        const parsedHeaders = profilingLogic.parseHeaders(headerRows, []);
-                        const structuredData = cleaningLogic.structureData(
-                          { fileName: f.name, tableHeaders: parsedHeaders, tableData: data.slice(3) },
-                          []
-                        );
-                        const withCalcs = calculationLogic.performAllCalculations(structuredData.structuredData);
-                        const cname = courseNameFrom(f.name);
-
-                        setCourses((prev) => {
-                          const exists = prev.some((c) => c.name === cname);
-                          return exists
-                            ? prev.map((c) => (c.name === cname ? { ...c, data: withCalcs } : c))
-                            : [...prev, { name: cname, data: withCalcs }];
-                        });
-                        setSelectedCourse(cname);
+                        const profiles = importWorkbookToProfiles(wb, f.name);
+                        if (profiles.length > 0) {
+                          handleWorkbookProcessed(profiles);
+                        }
                       } catch (err) {
                         console.error(err);
                       } finally {
