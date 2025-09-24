@@ -235,20 +235,35 @@
     // Componente Consultas/Reportes Rápidos
     // =============================
     function QuickReportsView({ data }) {
+      const [courseFilter, setCourseFilter] = useState('ALL');
+
+      const courseOptions = useMemo(() => {
+        const set = new Set(
+          Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []
+        );
+        return ['ALL', ...Array.from(set)];
+      }, [data]);
+
+      const filteredData = useMemo(() => {
+        if (!Array.isArray(data)) return [];
+        if (courseFilter === 'ALL') return data;
+        return data.filter(s => s.__course === courseFilter);
+      }, [data, courseFilter]);
+
       // Promedios más bajos por área
-      const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+      const areaLabels = Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas))));
       // Promedios más bajos por área: solo estudiantes con promedio < 3.0
       const lowAverages = areaLabels.map(area => {
-        const students = data.map(s => ({
+        const students = filteredData.map(s => ({
           name: s.name,
           prom: s.areas[area]?.areaStats?.promedioActual ?? null
         })).filter(s => typeof s.prom === 'number' && s.prom < 3.0);
         students.sort((a,b) => a.prom-b.prom);
         return { area, students };
-      });
+      }).filter(a => a.students.length > 0);
 
       // Estudiantes con más áreas perdidas (todos los que tengan al menos 1)
-      const lostAreas = data.map(s => ({
+      const lostAreas = filteredData.map(s => ({
         name: s.name,
         perdidas: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Perdido').length
       }));
@@ -256,7 +271,7 @@
       const topLost = lostAreas.filter(s=>s.perdidas>0);
 
       // Estudiantes con más áreas en riesgo (todos los que tengan al menos 1)
-      const riskAreas = data.map(s => ({
+      const riskAreas = filteredData.map(s => ({
         name: s.name,
         riesgo: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='En riesgo').length
       }));
@@ -264,7 +279,7 @@
       const topRisk = riskAreas.filter(s=>s.riesgo>0);
 
       // Estudiantes con más áreas recuperables (todos los que tengan al menos 1)
-      const recupAreas = data.map(s => ({
+      const recupAreas = filteredData.map(s => ({
         name: s.name,
         recup: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Recuperable').length
       }));
@@ -273,18 +288,18 @@
 
       // Áreas con más estudiantes en riesgo (todas las áreas con al menos 1 estudiante en riesgo)
       const areaRisk = areaLabels.map(area => {
-        const riesgo = data.filter(s => s.areas[area]?.areaStats?.estado?.text==='En riesgo').length;
+        const riesgo = filteredData.filter(s => s.areas[area]?.areaStats?.estado?.text==='En riesgo').length;
         return { area, riesgo };
       }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo);
 
       // Top estudiantes con mejor desempeño global (top 10)
-      const globalProms = data.map(s => {
+      const globalProms = filteredData.map(s => {
         const proms = Object.values(s.areas).map(a => a.areaStats?.promedioActual).filter(v=>typeof v==='number');
         const prom = proms.length ? proms.reduce((a,b)=>a+b,0)/proms.length : null;
         return { name: s.name, prom };
       }).filter(s=>typeof s.prom==='number');
       globalProms.sort((a,b)=>b.prom-a.prom);
-      const topGlobal = globalProms.slice(0,10);
+      const topGlobal = globalProms.slice(0, 10);
 
       // Top estudiantes con peor desempeño global: solo los que tengan promedio < 3.0
       const worstGlobal = globalProms.filter(s=>s.prom < 3.0).sort((a,b)=>a.prom-b.prom);
@@ -293,6 +308,18 @@
       return (
         <div className="space-y-8">
           <h2 className="text-xl font-bold mb-4 text-blue-700">Consultas y Reportes Rápidos</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <label className="text-sm font-medium">Curso:</label>
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={courseFilter}
+              onChange={(e) => setCourseFilter(e.target.value)}
+            >
+              {courseOptions.map(opt => (
+                <option key={opt} value={opt}>{opt === 'ALL' ? 'Todos' : opt}</option>
+              ))}
+            </select>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-white border rounded-xl p-4 shadow">
               <h3 className="font-semibold mb-2 text-blue-600">Promedios más bajos por Área</h3>
