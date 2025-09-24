@@ -853,6 +853,13 @@
         return ['ALL', ...Array.from(set)];
       }, [data]);
 
+      const dataForAnalysis = useMemo(() => {
+        if (!Array.isArray(data)) return [];
+        if (courseFilterDV === 'ALL') return data;
+        return data.filter(s => (s?.__course || '') === courseFilterDV);
+      }, [data, courseFilterDV]);
+
+
 
       // Filtros avanzados interactivos
       const [studentFilter, setStudentFilter] = useState('');
@@ -861,9 +868,9 @@
       const [estadoFilter, setEstadoFilter] = useState('');
 
       // Listas únicas para filtros desplegables
-      const studentList = Array.from(new Set(data.map(s => s.name)));
-      const areaList = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
-      const asigList = Array.from(new Set(data.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas)))));
+      const studentList = Array.from(new Set(dataForAnalysis.map(s => s.name)));
+      const areaList = Array.from(new Set(dataForAnalysis.flatMap(s => Object.keys(s.areas))));
+      const asigList = Array.from(new Set(dataForAnalysis.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas)))));
       const estadoList = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
 
       // Función para resaltar filas críticas
@@ -879,7 +886,7 @@
 
       // Filtrado avanzado no destructivo: retorna filas completas
       const filteredRowsAsignatura = [];
-      data.forEach(st => {
+      dataForAnalysis.forEach(st => {
         Object.entries(st.areas).forEach(([areaName, areaData]) => {
           Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
             // Criterios de filtro
@@ -887,7 +894,7 @@
             const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
             const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
             const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));            
-            const matchCourse = courseFilterDV === 'ALL' ? true : (st.__course === courseFilterDV);
+            
             if (matchStudent && matchArea && matchAsig && matchEstado) {
               filteredRowsAsignatura.push({
                 id: `${st.id}-${areaName}-${asigName}`,
@@ -909,12 +916,12 @@
 
       // Filtrado avanzado no destructivo para área
       const filteredRowsArea = [];
-      data.forEach(st => {
+      dataForAnalysis.forEach(st => {
         Object.entries(st.areas).forEach(([areaName, areaData]) => {
           const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
           const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
           const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));          
-          const matchCourse = courseFilterDV === 'ALL' ? true : (st.__course === courseFilterDV);
+          
           if (matchStudent && matchArea && matchEstado) {
             filteredRowsArea.push({
               id: `${st.id}-${areaName}`,
@@ -934,17 +941,17 @@
 
       // KPIs estándar
       // Promedio general de notas (áreas)
-      const allProms = data.flatMap(st => Object.values(st.areas).map(a => a.areaStats?.promedioActual).filter(v => typeof v === 'number'));
+      const allProms = dataForAnalysis.flatMap(st => Object.values(st.areas).map(a => a.areaStats?.promedioActual).filter(v => typeof v === 'number'));
       const promGeneral = allProms.length ? (allProms.reduce((s,v)=>s+v,0)/allProms.length).toFixed(2) : 'N/A';
       // Porcentaje por estado académico
       const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-      const estadoCounts = estados.map(e => data.filter(st => Object.values(st.areas).some(a => a.areaStats?.estado?.text === e)).length);
+      const estadoCounts = estados.map(e => dataForAnalysis.filter(st => Object.values(st.areas).some(a => a.areaStats?.estado?.text === e)).length);
       // Áreas con mayor riesgo/reprobados
-      const areaLabels = Array.from(new Set(data.flatMap(st => Object.keys(st.areas))));
+      const areaLabels = Array.from(new Set(dataForAnalysis.flatMap(st => Object.keys(st.areas))));
       const areaRiesgo = areaLabels.map(a => {
-        const total = data.length;
-        const enRiesgo = data.filter(st => st.areas[a]?.areaStats?.estado?.text === 'En riesgo').length;
-        const reprobados = data.filter(st => st.areas[a]?.areaStats?.estado?.text === 'Perdido').length;
+        const total = dataForAnalysis.length;
+        const enRiesgo = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'En riesgo').length;
+        const reprobados = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'Perdido').length;
         return { area: a, enRiesgo, reprobados, total };
       }).filter(a => a.enRiesgo > 0 || a.reprobados > 0);
 
@@ -977,7 +984,7 @@
                         <tr key={e}>
                           <td className="px-2 py-1">{e}</td>
                           <td className="px-2 py-1 text-right">{estadoCounts[i]}</td>
-                          <td className="px-2 py-1 text-right">{data.length>0 ? ((estadoCounts[i]/data.length)*100).toFixed(1)+'%' : '0%'}</td>
+                          <td className="px-2 py-1 text-right">{dataForAnalysis.length>0 ? ((estadoCounts[i]/dataForAnalysis.length)*100).toFixed(1)+'%' : '0%'}</td>
                         </tr>
                       ))}
                     </tbody>
