@@ -817,6 +817,7 @@
     };
 
     const DashboardView = ({ data, onReset, fileName }) => {
+      // console.log("DashboardView data sample:", data.slice(0, 5)); // Added log
       // Filtros avanzados interactivos
       const [studentFilter, setStudentFilter] = useState('');
       const [areaFilter, setAreaFilter] = useState('');
@@ -853,6 +854,7 @@
             if (matchStudent && matchArea && matchAsig && matchEstado) {
               filteredRowsAsignatura.push({
                 id: `${st.id}-${areaName}-${asigName}`,
+                __course: st.__course,
                 estudiante: st.name,
                 area: areaName,
                 asignatura: asigName,
@@ -878,6 +880,7 @@
           if (matchStudent && matchArea && matchEstado) {
             filteredRowsArea.push({
               id: `${st.id}-${areaName}`,
+              __course: st.__course,
               estudiante: st.name,
               area: areaName,
               defP1: areaData.DEF?.P1,
@@ -1027,7 +1030,7 @@
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRowsAsignatura.map(row => (
-                    <tr key={row.id} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                    <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
                       <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
@@ -1062,7 +1065,7 @@
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRowsArea.map(row => (
-                    <tr key={row.id} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                    <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
                       <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
@@ -1299,7 +1302,9 @@
             <DashboardTabs dashboardData={
               (selectedCourse && selectedCourse !== 'ALL')
                 ? (courses.find((c) => c.name === selectedCourse)?.data || analysisData)
-                : (courses.length > 0 ? courses.flatMap((c) => c.data) : analysisData)
+                : (courses.length > 0
+                  ? courses.flatMap((c) => c.data.map((s) => ({ ...s, __course: c.name })))
+                  : analysisData)
             } onReset={handleReset} fileName={processed.fileName} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
               <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>
