@@ -409,7 +409,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useRef, useEffect, Fragment } = React;
+    const { useState, useRef, useEffect, Fragment, useMemo } = React;
 
     // ==============================
     // Iconos (Lucide-like minimal)
@@ -845,6 +845,15 @@
 
     const DashboardView = ({ data, onReset, fileName }) => {
       // console.log("DashboardView data sample:", data.slice(0, 5)); // Added log
+      const showCourseCol = Array.isArray(data) && data.some(s => !!s?.__course);
+
+      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
+      const courseOptionsDV = useMemo(() => {
+        const set = new Set(Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []);
+        return ['ALL', ...Array.from(set)];
+      }, [data]);
+
+
       // Filtros avanzados interactivos
       const [studentFilter, setStudentFilter] = useState('');
       const [areaFilter, setAreaFilter] = useState('');
@@ -877,7 +886,8 @@
             const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
             const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
             const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
-            const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));
+            const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));            
+            const matchCourse = courseFilterDV === 'ALL' ? true : (st.__course === courseFilterDV);
             if (matchStudent && matchArea && matchAsig && matchEstado) {
               filteredRowsAsignatura.push({
                 id: `${st.id}-${areaName}-${asigName}`,
@@ -903,7 +913,8 @@
         Object.entries(st.areas).forEach(([areaName, areaData]) => {
           const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
           const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
-          const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));
+          const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));          
+          const matchCourse = courseFilterDV === 'ALL' ? true : (st.__course === courseFilterDV);
           if (matchStudent && matchArea && matchEstado) {
             filteredRowsArea.push({
               id: `${st.id}-${areaName}`,
@@ -1003,7 +1014,21 @@
           </div>
 
           {/* Filtros avanzados */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            {showCourseCol && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700">Filtrar por Curso</label>
+                <select
+                  className="mt-1 w-full border rounded-md p-2"
+                  value={courseFilterDV}
+                  onChange={(e) => setCourseFilterDV(e.target.value)}
+                >
+                  {courseOptionsDV.map(opt => (
+                    <option key={opt} value={opt}>{opt === 'ALL' ? 'Todos' : opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-700">Filtrar por Estudiante</label>
               <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estudiante..." value={studentFilter} onChange={e=>setStudentFilter(e.target.value)} />
@@ -1044,6 +1069,7 @@
               <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
+                    {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Asignatura</th>
@@ -1058,6 +1084,7 @@
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRowsAsignatura.map(row => (
                     <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                      {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
                       <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
@@ -1080,6 +1107,7 @@
               <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
+                    {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P1</th>
@@ -1093,6 +1121,7 @@
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRowsArea.map(row => (
                     <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                      {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
                       <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
