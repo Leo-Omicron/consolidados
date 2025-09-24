@@ -1077,7 +1077,10 @@
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
+                    <th
+                      className="px-3 py-2 text-left font-medium text-gray-500 uppercase"
+                      style={{ minWidth: '120px', maxWidth: '200px' }}
+                    >Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Asignatura</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P1</th>
@@ -1092,7 +1095,7 @@
                   {filteredRowsAsignatura.map(row => (
                     <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
                       {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
-                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
                       <td className="px-3 py-3 text-sm text-right">{typeof row.p1 === 'number' ? row.p1.toFixed(2) : '-'}</td>
@@ -1115,7 +1118,10 @@
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{minWidth:'120px',maxWidth:'200px'}}>Estudiante</th>
+                    <th
+                      className="px-3 py-2 text-left font-medium text-gray-500 uppercase"
+                      style={{ minWidth: '120px', maxWidth: '200px' }}
+                    >Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P1</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P2</th>
@@ -1129,7 +1135,7 @@
                   {filteredRowsArea.map(row => (
                     <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
                       {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
-                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r sticky left-0 bg-white z-10" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                       <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                       <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
                       <td className="px-3 py-3 text-sm text-right">{typeof row.defP2 === 'number' ? row.defP2.toFixed(2) : '-'}</td>
