@@ -814,101 +814,141 @@
       }[status.color] || null;
       return <span className={`px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${color}`}>{icon}{status.text}</span>;
     };
-    
+
     const UploadView = ({ onWorkbookProcessed, onLoading }) => {
       const safeLoading = {
         start: (msg) => { try { onLoading?.start?.(msg); } catch {} },
         update: (msg) => { try { onLoading?.update?.(msg); } catch {} },
         stop: () => { try { onLoading?.stop?.(); } catch {} },
       };
-      const [files, setFiles] = useState([]);
+      const [pendingFile, setPendingFile] = useState(null);
       const [isDragging, setIsDragging] = useState(false);
       const inputRef = useRef(null);
-    
-      const handleSelected = async (flist) => {
+      const [overlay, setOverlay] = useState({ visible: false, text: 'Procesando…' });
+
+      const handleSelected = (flist) => {
         if (!flist || flist.length === 0) return;
         const f = flist[0];
-        const token = `${f.name}-${f.lastModified}`;
-        setFiles([{ id: token, name: f.name, status: 'processing', message: 'Analizando hojas…' }]);
-    
-        safeLoading.start('Leyendo archivo…');
-    
+        setPendingFile(f);
+        if (inputRef.current) inputRef.current.value = '';
+      };
+
+      const handleProcessClick = async () => {
+        if (!pendingFile) return;
+
+        setOverlay({ visible: true, text: 'Procesando…' });
+        await new Promise(resolve => requestAnimationFrame(resolve));
+
+        const f = pendingFile;
         const reader = new FileReader();
+
         reader.onload = (e) => {
           try {
-            safeLoading.update('Interpretando libro de Excel…');
+            setOverlay({ visible: true, text: 'Importando libro de Excel…' });
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-    
+
             if (!wb.SheetNames || wb.SheetNames.length === 0) {
-              setFiles([{ id: token, name: f.name, status: 'error', message: 'El archivo no contiene hojas.' }]);
-              safeLoading.stop();
+              setOverlay({ visible: true, text: 'Error: El archivo no contiene hojas.' });
+              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setPendingFile(null);
               return;
             }
-    
-            safeLoading.update(`Perfilando ${wb.SheetNames.length} hoja${wb.SheetNames.length>1?'s':''}…`);
+            
+            setOverlay({ visible: true, text: 'Analizando hojas…' });
             const profiles = importWorkbookToProfiles(wb, f.name);
-    
+
             if (profiles.length === 0) {
-              setFiles([{ id: token, name: f.name, status: 'error', message: 'Estructura inválida: se requieren 3 encabezados + datos.' }]);
-              safeLoading.stop();
+              setOverlay({ visible: true, text: 'Error: Estructura inválida.' });
+              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setPendingFile(null);
               return;
             }
-    
-            // El procesamiento pesado continúa en handleWorkbookProcessed (con loader)
+            
+            setOverlay({ visible: true, text: 'Consolidando datos…' });
             onWorkbookProcessed(profiles);
           } catch (err) {
-            setFiles([{ id: token, name: f.name, status: 'error', message: 'No se pudo leer el archivo.' }]);
-            safeLoading.stop();
-          } finally {
-            if (inputRef.current) inputRef.current.value = '';
+            console.error("Error processing file:", err);
+            setOverlay({ visible: true, text: 'Error al procesar. Revise el archivo.' });
+            setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+            setPendingFile(null);
           }
         };
-        reader.onerror = () => { setFiles([{ id: token, name: f.name, status: 'error', message: 'Error al leer el archivo.' }]); safeLoading.stop(); };
+
+        reader.onerror = () => {
+          setOverlay({ visible: true, text: 'Error al leer el archivo.' });
+          setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+          setPendingFile(null);
+        };
+
         reader.readAsArrayBuffer(f);
       };
-    
+
       const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); handleSelected(e.dataTransfer.files); };
       const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(e.type === 'dragenter' || e.type === 'dragover'); };
-    
+
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6">
           <div className="w-full max-w-3xl">
             <h1 className="text-3xl font-bold text-center">Dashboard Académico</h1>
             <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
-            <div
-              onDrop={handleDrop}
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              className={`relative flex flex-col items-center justify-center w-full p-10 border-2 border-dashed rounded-xl cursor-pointer transition ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
-              onClick={() => inputRef.current?.click()}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                  <span className="text-sm font-mono">XLSX</span>
+            <div className="space-y-4">
+              <div
+                onDrop={handleDrop}
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                className={`relative flex flex-col items-center justify-center w-full p-10 border-2 border-dashed rounded-xl cursor-pointer transition ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
+                onClick={() => inputRef.current?.click()}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                    <span className="text-sm font-mono">XLSX</span>
+                  </div>
+                  <p className="font-semibold text-gray-800">Arrastra y suelta un archivo aquí</p>
+                  <p className="text-sm text-gray-500">o</p>
+                  <button
+                    type="button"
+                    className="mt-1 inline-flex items-center px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Seleccionar archivo
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">Cada hoja se importará como curso.</p>
                 </div>
-                <p className="font-semibold text-gray-800">Arrastra y suelta un archivo aquí</p>
-                <p className="text-sm text-gray-500">o</p>
-                <button
-                  type="button"
-                  className="mt-1 inline-flex items-center px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Seleccionar archivo
-                </button>
-                <p className="text-xs text-gray-500 mt-2">Cada hoja se importará como curso.</p>
-              </div>
 
-              {/* input real */}
-              <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                onChange={(e)=>handleSelected(e.target.files)}
-                accept=".xlsx,.xls,.csv"
-                aria-label="Seleccionar archivo Excel o CSV para importar cursos"
-              />
+                {/* input real */}
+                <input
+                  ref={inputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e)=>handleSelected(e.target.files)}
+                  accept=".xlsx,.xls,.csv"
+                  aria-label="Seleccionar archivo Excel o CSV para importar cursos"
+                />
+              </div>
+              {pendingFile && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Archivo seleccionado:</p>
+                    <p className="text-sm text-blue-700">{pendingFile.name}</p>
+                  </div>
+                  <button
+                    onClick={handleProcessClick}
+                    className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700"
+                  >
+                    Procesar archivo
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+          {overlay.visible && (
+            <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" role="status" aria-live="assertive">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin h-10 w-10 rounded-full border-4 border-blue-300 border-t-blue-600"></div>
+                <p className="mt-3 font-semibold text-blue-800">{overlay.text}</p>
+              </div>
+            </div>
+          )}
         </div>
       );
     };
