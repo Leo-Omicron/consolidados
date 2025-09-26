@@ -117,26 +117,40 @@
     // Componente de Gráficos (Chart.js)
     // =============================
     function DashboardCharts({ data }) {
+      console.time('render:DashboardCharts');
       const barRef = useRef(null);
       const pieRef = useRef(null);
       const radarRef = useRef(null);
       const charts = useRef({});
 
-      useEffect(() => {
-        if (!Array.isArray(data)) return;
-
+      const chartData = useMemo(() => {
+        if (!Array.isArray(data)) {
+          return { estados: [], estadoCounts: [], areaLabels: [], areaProms: [] };
+        }
         const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
         const estadoCounts = estados.map(e =>
           data.filter(est => Object.values(est.areas).some(a => a.areaStats?.estado?.text === e)).length
         );
+        const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+        const areaProms = areaLabels.map(a => {
+          const arr = data.flatMap(s => s.areas[a]?.areaStats?.promedioActual ?? []);
+          const nums = arr.filter(v => typeof v === 'number');
+          return nums.length ? Number((nums.reduce((s,v)=>s+v,0)/nums.length).toFixed(2)) : 0;
+        });
+        return { estados, estadoCounts, areaLabels, areaProms };
+      }, [data]);
+
+      useEffect(() => {
+        if (!chartData) return;
+        const { estados, estadoCounts, areaLabels, areaProms } = chartData;
 
         const mk = (key, ref, cfg) => {
-          if (!ref) return;
+          if (!ref.current) return;
           charts.current[key]?.destroy();
-          charts.current[key] = new window.Chart(ref, cfg);
+          charts.current[key] = new window.Chart(ref.current, cfg);
         };
 
-        mk('bar', barRef.current, {
+        mk('bar', barRef, {
           type: 'bar',
           data: {
             labels: estados,
@@ -145,7 +159,7 @@
           options: { responsive: true, plugins: { legend: { display: false } } }
         });
 
-        mk('pie', pieRef.current, {
+        mk('pie', pieRef, {
           type: 'pie',
           data: {
             labels: estados,
@@ -154,14 +168,7 @@
           options: { responsive: true }
         });
 
-        const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
-        const areaProms = areaLabels.map(a => {
-          const arr = data.flatMap(s => s.areas[a]?.areaStats?.promedioActual ?? []);
-          const nums = arr.filter(v => typeof v === 'number');
-          return nums.length ? Number((nums.reduce((s,v)=>s+v,0)/nums.length).toFixed(2)) : 0;
-        });
-
-        mk('radar', radarRef.current, {
+        mk('radar', radarRef, {
           type: 'radar',
           data: {
             labels: areaLabels,
@@ -174,18 +181,12 @@
           Object.values(charts.current).forEach(c => c?.destroy());
           charts.current = {};
         };
-      }, [data]);
+      }, [chartData]);
 
-      const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-      const estadoCounts = estados.map(e =>
-        data.filter(est => Object.values(est.areas).some(a => a.areaStats?.estado?.text === e)).length
-      );
+      const { estados, estadoCounts, areaLabels, areaProms } = chartData || { estados: [], estadoCounts: [], areaLabels: [], areaProms: [] };
 
-      const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
-      const areaProms = areaLabels.map(a => {
-        const arr = data.flatMap(s => s.areas[a]?.areaStats?.promedioActual ?? []);
-        const nums = arr.filter(v => typeof v === 'number');
-        return nums.length ? (nums.reduce((s,v)=>s+v,0)/nums.length).toFixed(2) : 0;
+      useEffect(() => {
+        console.timeEnd('render:DashboardCharts');
       });
 
       return (
@@ -247,7 +248,7 @@
                 </tr>
               </thead>
               <tbody>
-                {areaLabels.map((a, i) => (
+                {(areaLabels || []).map((a, i) => (
                   <tr key={a}>
                     <td className="border px-1">{a}</td>
                     <td className="border px-1">{areaProms[i]}</td>
@@ -333,6 +334,7 @@
     // Componente Consultas/Reportes Rápidos
     // =============================
     function QuickReportsView({ data }) {
+      console.time('render:QuickReportsView');
       const [courseFilter, setCourseFilter] = useState('ALL');
 
       const courseOptions = useMemo(() => {
@@ -348,61 +350,65 @@
         return data.filter(s => s.__course === courseFilter);
       }, [data, courseFilter]);
 
-      // Promedios más bajos por área
-      const areaLabels = Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas))));
-      // Promedios más bajos por área: solo estudiantes con promedio < 3.0
-      const lowAverages = areaLabels.map(area => {
+      const areaLabels = useMemo(() => Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas)))), [filteredData]);
+
+      const lowAverages = useMemo(() => areaLabels.map(area => {
         const students = filteredData.map(s => ({
           name: s.name,
           prom: s.areas[area]?.areaStats?.promedioActual ?? null
         })).filter(s => typeof s.prom === 'number' && s.prom < 3.0);
         students.sort((a,b) => a.prom-b.prom);
         return { area, students };
-      }).filter(a => a.students.length > 0);
+      }).filter(a => a.students.length > 0), [filteredData, areaLabels]);
 
-      // Estudiantes con más áreas perdidas (todos los que tengan al menos 1)
-      const lostAreas = filteredData.map(s => ({
-        name: s.name,
-        perdidas: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Perdido').length
-      }));
-      lostAreas.sort((a,b)=>b.perdidas-a.perdidas);
-      const topLost = lostAreas.filter(s=>s.perdidas>0);
+      const topLost = useMemo(() => {
+        const lostAreas = filteredData.map(s => ({
+          name: s.name,
+          perdidas: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Perdido').length
+        }));
+        lostAreas.sort((a,b)=>b.perdidas-a.perdidas);
+        return lostAreas.filter(s=>s.perdidas>0);
+      }, [filteredData]);
 
-      // Estudiantes con más áreas en riesgo (todos los que tengan al menos 1)
-      const riskAreas = filteredData.map(s => ({
-        name: s.name,
-        riesgo: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='En riesgo').length
-      }));
-      riskAreas.sort((a,b)=>b.riesgo-a.riesgo);
-      const topRisk = riskAreas.filter(s=>s.riesgo>0);
+      const topRisk = useMemo(() => {
+        const riskAreas = filteredData.map(s => ({
+          name: s.name,
+          riesgo: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='En riesgo').length
+        }));
+        riskAreas.sort((a,b)=>b.riesgo-a.riesgo);
+        return riskAreas.filter(s=>s.riesgo>0);
+      }, [filteredData]);
 
-      // Estudiantes con más áreas recuperables (todos los que tengan al menos 1)
-      const recupAreas = filteredData.map(s => ({
-        name: s.name,
-        recup: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Recuperable').length
-      }));
-      recupAreas.sort((a,b)=>b.recup-a.recup);
-      const topRecup = recupAreas.filter(s=>s.recup>0);
+      const topRecup = useMemo(() => {
+        const recupAreas = filteredData.map(s => ({
+          name: s.name,
+          recup: Object.values(s.areas).filter(a => a.areaStats?.estado?.text==='Recuperable').length
+        }));
+        recupAreas.sort((a,b)=>b.recup-a.recup);
+        return recupAreas.filter(s=>s.recup>0);
+      }, [filteredData]);
 
-      // Áreas con más estudiantes en riesgo (todas las áreas con al menos 1 estudiante en riesgo)
-      const areaRisk = areaLabels.map(area => {
+      const areaRisk = useMemo(() => areaLabels.map(area => {
         const riesgo = filteredData.filter(s => s.areas[area]?.areaStats?.estado?.text==='En riesgo').length;
         return { area, riesgo };
-      }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo);
+      }).filter(a=>a.riesgo>0).sort((a,b)=>b.riesgo-a.riesgo), [filteredData, areaLabels]);
 
-      // Top estudiantes con mejor desempeño global (top 10)
-      const globalProms = filteredData.map(s => {
-        const proms = Object.values(s.areas).map(a => a.areaStats?.promedioActual).filter(v=>typeof v==='number');
-        const prom = proms.length ? proms.reduce((a,b)=>a+b,0)/proms.length : null;
-        return { name: s.name, prom };
-      }).filter(s=>typeof s.prom==='number');
-      globalProms.sort((a,b)=>b.prom-a.prom);
-      const topGlobal = globalProms.slice(0, 10);
+      const { topGlobal, worstGlobal } = useMemo(() => {
+        const globalProms = filteredData.map(s => {
+          const proms = Object.values(s.areas).map(a => a.areaStats?.promedioActual).filter(v=>typeof v==='number');
+          const prom = proms.length ? proms.reduce((a,b)=>a+b,0)/proms.length : null;
+          return { name: s.name, prom };
+        }).filter(s=>typeof s.prom==='number');
+        globalProms.sort((a,b)=>b.prom-a.prom);
+        const topGlobal = globalProms.slice(0, 10);
+        const worstGlobal = globalProms.filter(s=>s.prom < 3.0).sort((a,b)=>a.prom-b.prom);
+        return { topGlobal, worstGlobal };
+      }, [filteredData]);
 
-      // Top estudiantes con peor desempeño global: solo los que tengan promedio < 3.0
-      const worstGlobal = globalProms.filter(s=>s.prom < 3.0).sort((a,b)=>a.prom-b.prom);
+      useEffect(() => {
+        console.timeEnd('render:QuickReportsView');
+      });
 
-      // ...existing code...
       return (
         <div className="space-y-8">
           <h2 className="text-xl font-bold mb-4 text-blue-700">Consultas y Reportes Rápidos</h2>
@@ -1056,10 +1062,19 @@
     };
 
     const DashboardView = ({ data, onReset, fileName }) => {
-      // console.log("DashboardView data sample:", data.slice(0, 5)); // Added log
-      const showCourseCol = Array.isArray(data) && data.some(s => !!s?.__course);
-
+      console.time('render:DashboardView');
       const [courseFilterDV, setCourseFilterDV] = useState('ALL');
+      const [studentFilter, setStudentFilter] = useState('');
+      const [areaFilter, setAreaFilter] = useState('');
+      const [asigFilter, setAsigFilter] = useState('');
+      const [estadoFilter, setEstadoFilter] = useState('');
+      const [subtab, setSubtab] = useState('areas');
+      const [pageAreas, setPageAreas] = useState(1);
+      const [pageAsig, setPageAsig] = useState(1);
+      const pageSize = 50;
+
+      const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.__course), [data]);
+
       const courseOptionsDV = useMemo(() => {
         const set = new Set(Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []);
         return ['ALL', ...Array.from(set)];
@@ -1071,21 +1086,19 @@
         return data.filter(s => (s?.__course || '') === courseFilterDV);
       }, [data, courseFilterDV]);
 
+      useEffect(() => {
+        setPageAreas(1);
+        setPageAsig(1);
+      }, [dataForAnalysis, studentFilter, areaFilter, asigFilter, estadoFilter]);
 
+      console.debug('[DashboardView] subtab', subtab, {pageAreas, pageAsig});
+      console.debug('[DashboardView] memo recompute', {courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter});
 
-      // Filtros avanzados interactivos
-      const [studentFilter, setStudentFilter] = useState('');
-      const [areaFilter, setAreaFilter] = useState('');
-      const [asigFilter, setAsigFilter] = useState('');
-      const [estadoFilter, setEstadoFilter] = useState('');
+      const studentList = useMemo(() => Array.from(new Set(dataForAnalysis.map(s => s.name))), [dataForAnalysis]);
+      const areaList = useMemo(() => Array.from(new Set(dataForAnalysis.flatMap(s => Object.keys(s.areas)))), [dataForAnalysis]);
+      const asigList = useMemo(() => Array.from(new Set(dataForAnalysis.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas))))), [dataForAnalysis]);
+      const estadoList = useMemo(() => ['Perdido','En riesgo','Recuperable','Ganable','Ganado'], []);
 
-      // Listas únicas para filtros desplegables
-      const studentList = Array.from(new Set(dataForAnalysis.map(s => s.name)));
-      const areaList = Array.from(new Set(dataForAnalysis.flatMap(s => Object.keys(s.areas))));
-      const asigList = Array.from(new Set(dataForAnalysis.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas)))));
-      const estadoList = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-
-      // Función para resaltar filas críticas
       const getRowClass = (estado) => {
         if (!estado) return '';
         if (estado.text === 'Perdido') return 'bg-red-50';
@@ -1096,76 +1109,78 @@
         return '';
       };
 
-      // Filtrado avanzado no destructivo: retorna filas completas
-      const filteredRowsAsignatura = [];
-      dataForAnalysis.forEach(st => {
-        Object.entries(st.areas).forEach(([areaName, areaData]) => {
-          Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
-            // Criterios de filtro
+      const filteredRowsAsignatura = useMemo(() => {
+        const filtered = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
+            Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
+              const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
+              const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
+              const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
+              const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));
+              if (matchStudent && matchArea && matchAsig && matchEstado) {
+                filtered.push({
+                  id: `${st.id}-${areaName}-${asigName}`, __course: st.__course, estudiante: st.name, area: areaName, asignatura: asigName,
+                  p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
+                  promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
+                });
+              }
+            });
+          });
+        });
+        return filtered;
+      }, [dataForAnalysis, studentFilter, areaFilter, asigFilter, estadoFilter]);
+
+      const filteredRowsArea = useMemo(() => {
+        const filtered = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
             const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
             const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
-            const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
-            const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));            
-            
-            if (matchStudent && matchArea && matchAsig && matchEstado) {
-              filteredRowsAsignatura.push({
-                id: `${st.id}-${areaName}-${asigName}`,
-                __course: st.__course,
-                estudiante: st.name,
-                area: areaName,
-                asignatura: asigName,
-                p1: asigData.P1,
-                p2: asigData.P2,
-                p3: asigData.P3,
-                promActual: asigData.promedioActual,
-                p4Min: asigData.p4Min,
-                estado: asigData.estado
+            const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));
+            if (matchStudent && matchArea && matchEstado) {
+              filtered.push({
+                id: `${st.id}-${areaName}`, __course: st.__course, estudiante: st.name, area: areaName,
+                defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
+                promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
               });
             }
           });
         });
-      });
+        return filtered;
+      }, [dataForAnalysis, studentFilter, areaFilter, estadoFilter]);
 
-      // Filtrado avanzado no destructivo para área
-      const filteredRowsArea = [];
-      dataForAnalysis.forEach(st => {
-        Object.entries(st.areas).forEach(([areaName, areaData]) => {
-          const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
-          const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
-          const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));          
-          
-          if (matchStudent && matchArea && matchEstado) {
-            filteredRowsArea.push({
-              id: `${st.id}-${areaName}`,
-              __course: st.__course,
-              estudiante: st.name,
-              area: areaName,
-              defP1: areaData.DEF?.P1,
-              defP2: areaData.DEF?.P2,
-              defP3: areaData.DEF?.P3,
-              promActual: areaData.areaStats?.promedioActual,
-              p4Min: areaData.areaStats?.p4Min,
-              estado: areaData.areaStats?.estado
-            });
-          }
-        });
-      });
+      const pagedRowsAsignatura = useMemo(() => {
+          const start = (pageAsig - 1) * pageSize;
+          return filteredRowsAsignatura.slice(start, start + pageSize);
+      }, [filteredRowsAsignatura, pageAsig]);
 
-      // KPIs estándar
-      // Promedio general de notas (áreas)
-      const allProms = dataForAnalysis.flatMap(st => Object.values(st.areas).map(a => a.areaStats?.promedioActual).filter(v => typeof v === 'number'));
-      const promGeneral = allProms.length ? (allProms.reduce((s,v)=>s+v,0)/allProms.length).toFixed(2) : 'N/A';
-      // Porcentaje por estado académico
-      const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-      const estadoCounts = estados.map(e => dataForAnalysis.filter(st => Object.values(st.areas).some(a => a.areaStats?.estado?.text === e)).length);
-      // Áreas con mayor riesgo/reprobados
-      const areaLabels = Array.from(new Set(dataForAnalysis.flatMap(st => Object.keys(st.areas))));
-      const areaRiesgo = areaLabels.map(a => {
-        const total = dataForAnalysis.length;
-        const enRiesgo = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'En riesgo').length;
-        const reprobados = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'Perdido').length;
-        return { area: a, enRiesgo, reprobados, total };
-      }).filter(a => a.enRiesgo > 0 || a.reprobados > 0);
+      const pagedRowsArea = useMemo(() => {
+          const start = (pageAreas - 1) * pageSize;
+          return filteredRowsArea.slice(start, start + pageSize);
+      }, [filteredRowsArea, pageAreas]);
+
+      const totalPagesAsig = Math.ceil(filteredRowsAsignatura.length / pageSize);
+      const totalPagesAreas = Math.ceil(filteredRowsArea.length / pageSize);
+
+      const { promGeneral, estadoCounts, areaRiesgo, estados } = useMemo(() => {
+        const allProms = dataForAnalysis.flatMap(st => Object.values(st.areas).map(a => a.areaStats?.promedioActual).filter(v => typeof v === 'number'));
+        const promGeneral = allProms.length ? (allProms.reduce((s,v)=>s+v,0)/allProms.length).toFixed(2) : 'N/A';
+        const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
+        const estadoCounts = estados.map(e => dataForAnalysis.filter(st => Object.values(st.areas).some(a => a.areaStats?.estado?.text === e)).length);
+        const areaLabels = Array.from(new Set(dataForAnalysis.flatMap(st => Object.keys(st.areas))));
+        const areaRiesgo = areaLabels.map(a => {
+          const total = dataForAnalysis.length;
+          const enRiesgo = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'En riesgo').length;
+          const reprobados = dataForAnalysis.filter(st => st.areas[a]?.areaStats?.estado?.text === 'Perdido').length;
+          return { area: a, enRiesgo, reprobados, total };
+        }).filter(a => a.enRiesgo > 0 || a.reprobados > 0);
+        return { promGeneral, estadoCounts, areaRiesgo, estados };
+      }, [dataForAnalysis]);
+
+      useEffect(() => {
+        console.timeEnd('render:DashboardView');
+      });
 
       return (
         <div className="max-w-screen-xl mx-auto px-2 md:px-6 py-4 md:py-8 space-y-8">
@@ -1282,85 +1297,102 @@
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
-            <h2 className="text-lg font-semibold mb-2 flex items-center"><BarChartIcon className="w-5 h-5 mr-2 text-blue-600"/>Análisis por Asignatura</h2>
-            <div className="overflow-auto max-h-[60vh] border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
-                    <th
-                      className="px-3 py-2 text-left font-medium text-gray-500 uppercase"
-                      style={{ minWidth: '120px', maxWidth: '200px' }}
-                    >Estudiante</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Asignatura</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P1</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P2</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P3</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredRowsAsignatura.map(row => (
-                    <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                      {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
-                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                      <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.p1 === 'number' ? row.p1.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.p2 === 'number' ? row.p2.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.p3 === 'number' ? row.p3.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
-                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
-                      <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div role="tablist" aria-label="Vistas de análisis" className="flex gap-2 mb-4 border-b">
+              <button role="tab" aria-selected={subtab === 'areas'} onClick={() => setSubtab('areas')} className={`px-4 py-2 font-semibold ${subtab === 'areas' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>Análisis por Área</button>
+              <button role="tab" aria-selected={subtab === 'asignaturas'} onClick={() => setSubtab('asignaturas')} className={`px-4 py-2 font-semibold ${subtab === 'asignaturas' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>Análisis por Asignatura</button>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
-            <h2 className="text-lg font-semibold mb-2 flex items-center"><DatabaseIcon className="w-5 h-5 mr-2 text-green-600"/>Análisis por Área</h2>
-            <div className="overflow-auto max-h-[60vh] border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
-                    <th
-                      className="px-3 py-2 text-left font-medium text-gray-500 uppercase"
-                      style={{ minWidth: '120px', maxWidth: '200px' }}
-                    >Estudiante</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P1</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P2</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P3</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
-                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
-                    <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredRowsArea.map(row => (
-                    <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                      {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
-                      <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                      <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP2 === 'number' ? row.defP2.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right">{typeof row.defP3 === 'number' ? row.defP3.toFixed(2) : '-'}</td>
-                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
-                      <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
-                      <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {subtab === 'asignaturas' &&
+            <div role="tabpanel">
+              <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
+                <h2 className="text-lg font-semibold mb-2 flex items-center"><BarChartIcon className="w-5 h-5 mr-2 text-blue-600"/>Análisis por Asignatura</h2>
+                <div className="overflow-auto max-h-[60vh] border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Asignatura</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P1</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P2</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P3</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
+                        <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {pagedRowsAsignatura.map(row => (
+                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+                          <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.p1 === 'number' ? row.p1.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.p2 === 'number' ? row.p2.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.p3 === 'number' ? row.p3.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-between items-center mt-2 text-xs">
+                    <button onClick={() => setPageAsig(p => Math.max(1, p - 1))} disabled={pageAsig === 1} className="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+                    <span>Página {pageAsig} de {totalPagesAsig} ({filteredRowsAsignatura.length} filas)</span>
+                    <button onClick={() => setPageAsig(p => Math.min(totalPagesAsig, p + 1))} disabled={pageAsig >= totalPagesAsig} className="px-3 py-1 border rounded disabled:opacity-50">Siguiente</button>
+                </div>
+              </div>
             </div>
-          </div>
+          }
+
+          {subtab === 'areas' &&
+            <div role="tabpanel">
+              <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
+                <h2 className="text-lg font-semibold mb-2 flex items-center"><DatabaseIcon className="w-5 h-5 mr-2 text-green-600"/>Análisis por Área</h2>
+                <div className="overflow-auto max-h-[60vh] border rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P1</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P2</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">DEF P3</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Promedio actual</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P4 mín. (≥3.0)</th>
+                        <th className="px-3 py-2 text-center font-medium text-gray-500 uppercase">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {pagedRowsArea.map(row => (
+                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP2 === 'number' ? row.defP2.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP3 === 'number' ? row.defP3.toFixed(2) : '-'}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                 <div className="flex justify-between items-center mt-2 text-xs">
+                    <button onClick={() => setPageAreas(p => Math.max(1, p - 1))} disabled={pageAreas === 1} className="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+                    <span>Página {pageAreas} de {totalPagesAreas} ({filteredRowsArea.length} filas)</span>
+                    <button onClick={() => setPageAreas(p => Math.min(totalPagesAreas, p + 1))} disabled={pageAreas >= totalPagesAreas} className="px-3 py-1 border rounded disabled:opacity-50">Siguiente</button>
+                </div>
+              </div>
+            </div>
+          }
         </div>
       );
     };
@@ -1392,7 +1424,7 @@
         'BIOLOGIA','BIOLOGIA','BIOLOGIA', 'EDUCACION AMBIENTAL','EDUCACION AMBIENTAL','EDUCACION AMBIENTAL',
         'COMPRENSION LECTORA','COMPRENSION LECTORA','COMPRENSION LECTORA', 'ESPAÑOL','ESPAÑOL','ESPAÑOL',
         'ÉTICA Y VALORES','ÉTICA Y VALORES','ÉTICA Y VALORES',
-        'EDUCACION ARTISTICA','EDUCACION ARTISTICA','EDUCACION ARTISTICA',
+        'EDUCACION ARTISTICA','EDUCACION ARTISTICA','EDUCacion ARTISTICA',
         'EDUCACION FISICA RECREACION Y DEPORTE','EDUCACION FISICA RECREACION Y DEPORTE','EDUCACION FISICA RECREACION Y DEPORTE',
         'EDUCACION RELIGIOSA','EDUCACION RELIGIOSA','EDUCACION RELIGIOSA',
         'INGLES','INGLES','INGLES',
@@ -1783,6 +1815,16 @@
         );
       };
 
+      const dashboardData = useMemo(() => {
+        if (selectedCourse && selectedCourse !== 'ALL') {
+          return courses.find(c => c.name === selectedCourse)?.data ?? analysisData;
+        }
+        if (courses.length > 0) {
+          return courses.flatMap(c => c.data.map(s => ({ ...s, __course: c.name })));
+        }
+        return analysisData;
+      }, [courses, selectedCourse, analysisData]);
+
       return (
         <div>
           {view==='upload' && (
@@ -1888,16 +1930,9 @@
                 }}
               />
             </div>
-            <DashboardTabs dashboardData={
-              (selectedCourse && selectedCourse !== 'ALL')
-                ? (courses.find((c) => c.name === selectedCourse)?.data || analysisData)
-                : (courses.length > 0
-                  ? courses.flatMap((c) => c.data.map((s) => ({ ...s, __course: c.name })))
-                  : analysisData)
-            } onReset={handleReset} fileName={processed.fileName} />
+            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
-              <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>
-              <hr className="my-6"/>
+              <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>              <hr className="my-6"/>
               <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
             </div>
             <LoadingOverlay show={loading} message={loadingMsg} />
