@@ -1527,6 +1527,7 @@
       const [processed, setProcessed] = useState(initialProcessed);
       const [acceptChecks, setAcceptChecks] = useState({ defPropagation:false, singleArea:false, renderOK:false });
       const [qualityLog, setQualityLog] = useState([]);
+      const [derived, setDerived] = useState(null);
       const addInputRef = useRef(null);
       const courseNameFrom = (name) => String(name || '').replace(/\.(xlsx|xls|csv)$/i, '');
 
@@ -1539,6 +1540,45 @@
 
       // Pequeño "yield" para permitir pintar la UI entre pasos pesados
       const uiTick = () => new Promise(r => setTimeout(r, 0));
+
+      const buildDerived = (dataset) => {
+        if (!Array.isArray(dataset)) return { rowsArea: [], rowsAsignatura: [] };
+
+        const rowsArea = dataset.flatMap(st =>
+          Object.entries(st.areas).map(([areaName, areaData]) => ({
+            id: `${st.id}-${areaName}`,
+            __course: st.__course,
+            estudiante: st.name,
+            area: areaName,
+            defP1: areaData.DEF?.P1,
+            defP2: areaData.DEF?.P2,
+            defP3: areaData.DEF?.P3,
+            promActual: areaData.areaStats?.promedioActual,
+            p4Min: areaData.areaStats?.p4Min,
+            estado: areaData.areaStats?.estado,
+          }))
+        );
+
+        const rowsAsignatura = dataset.flatMap(st =>
+          Object.entries(st.areas).flatMap(([areaName, areaData]) =>
+            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => ({
+              id: `${st.id}-${areaName}-${asigName}`,
+              __course: st.__course,
+              estudiante: st.name,
+              area: areaName,
+              asignatura: asigName,
+              p1: asigData.P1,
+              p2: asigData.P2,
+              p3: asigData.P3,
+              promActual: asigData.promedioActual,
+              p4Min: asigData.p4Min,
+              estado: asigData.estado,
+            }))
+          )
+        );
+
+        return { rowsArea, rowsAsignatura };
+      };
 
       // ---------- Utilidades de estado/persistencia ----------
       const persistCourses = (arr) => {
@@ -1740,6 +1780,12 @@
           : mergedCourses[0].data;
 
         setAnalysisData(nextData);
+
+        const d = buildDerived(nextData);
+        setDerived(d);
+        console.debug('[App] derived built (areas)', { rowsArea: d?.rowsArea?.length });
+        console.debug('[App] derived built (asignaturas)', { rowsAsignatura: d?.rowsAsignatura?.length });
+
         setAcceptChecks(selfChecks(mergedCourses[0].data));
         setProcessed({
           fileName: `${profiles[0].fileName} (${profiles.length} hoja${profiles.length>1?'s':''})`,
