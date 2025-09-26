@@ -1542,7 +1542,9 @@
       const uiTick = () => new Promise(r => setTimeout(r, 0));
 
       const buildDerived = (dataset) => {
-        if (!Array.isArray(dataset)) return { rowsArea: [], rowsAsignatura: [] };
+        if (!Array.isArray(dataset) || dataset.length === 0) {
+          return { rowsArea: [], rowsAsignatura: [], studentList: [], areaList: [], asigList: [], courseList: [], promGeneral: 0, estadoCounts: {}, areaRiesgo: [] };
+        }
 
         const rowsArea = dataset.flatMap(st =>
           Object.entries(st.areas).map(([areaName, areaData]) => ({
@@ -1577,7 +1579,41 @@
           )
         );
 
-        return { rowsArea, rowsAsignatura };
+        // 1. Índices únicos
+        const studentList = [...new Set(dataset.map(s => s.name))];
+        const areaList = [...new Set(rowsArea.map(r => r.area))];
+        const asigList = [...new Set(rowsAsignatura.map(r => r.asignatura))];
+        const courseListRaw = [...new Set(dataset.map(s => s.__course).filter(Boolean))];
+        const courseList = courseListRaw.length > 0 ? courseListRaw : ['ALL'];
+
+        // 2. KPIs globales
+        const proms = rowsArea.map(r => r.promActual).filter(p => typeof p === 'number' && !isNaN(p));
+        const promGeneral = proms.length > 0 ? proms.reduce((a, b) => a + b, 0) / proms.length : 0;
+
+        const estadoCounts = { Perdido: 0, 'En riesgo': 0, Recuperable: 0, Ganable: 0, Ganado: 0 };
+        const studentStates = new Map();
+        rowsArea.forEach(r => {
+          if (r.estado && r.estado.text && estadoCounts.hasOwnProperty(r.estado.text)) {
+            if (!studentStates.has(r.estudiante)) {
+              studentStates.set(r.estudiante, new Set());
+            }
+            studentStates.get(r.estudiante).add(r.estado.text);
+          }
+        });
+        
+        studentStates.forEach(states => {
+          states.forEach(state => {
+            estadoCounts[state]++;
+          });
+        });
+
+        const areaRiesgo = areaList.map(area => {
+          const enRiesgo = new Set(rowsArea.filter(r => r.area === area && r.estado?.text === 'En riesgo').map(r => r.estudiante)).size;
+          const reprobados = new Set(rowsArea.filter(r => r.area === area && r.estado?.text === 'Perdido').map(r => r.estudiante)).size;
+          return { area, enRiesgo, reprobados, total: studentList.length };
+        });
+
+        return { rowsArea, rowsAsignatura, studentList, areaList, asigList, courseList, promGeneral, estadoCounts, areaRiesgo };
       };
 
       // ---------- Utilidades de estado/persistencia ----------
@@ -1785,6 +1821,8 @@
         setDerived(d);
         console.debug('[App] derived built (areas)', { rowsArea: d?.rowsArea?.length });
         console.debug('[App] derived built (asignaturas)', { rowsAsignatura: d?.rowsAsignatura?.length });
+        console.debug('[App] derived built (indices)', { students: d.studentList.length, areas: d.areaList.length, asigs: d.asigList.length, courses: d.courseList.length });
+        console.debug('[App] derived built (kpis)', { promGeneral: d.promGeneral, estadoCounts: d.estadoCounts, areaRiesgo: d.areaRiesgo.length });
 
         setAcceptChecks(selfChecks(mergedCourses[0].data));
         setProcessed({
