@@ -264,7 +264,8 @@
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
     // =============================
-    function DashboardTabs({ dashboardData, onReset, fileName }) {
+    function DashboardTabs({ dashboardData, onReset, fileName, derived }) {
+      console.debug('[Tabs] received derived', { has: !!derived, rowsArea: Array.isArray(derived?.rowsArea) ? derived.rowsArea.length : 'NA' });
       const [tab, setTab] = useState('analisis');
 
       return (
@@ -313,7 +314,7 @@
           <div className="bg-white rounded-lg shadow p-4">
             {tab === 'analisis' && (
               <div role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis">
-                <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} />
+                <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} derived={derived} />
               </div>
             )}
             {tab === 'graficos' && (
@@ -1061,7 +1062,7 @@
       );
     };
 
-    const DashboardView = ({ data, onReset, fileName }) => {
+    const DashboardView = ({ data, onReset, fileName, derived }) => {
       console.time('render:DashboardView');
       const [courseFilterDV, setCourseFilterDV] = useState('ALL');
       const [studentFilter, setStudentFilter] = useState('');
@@ -1072,6 +1073,12 @@
       const [pageAreas, setPageAreas] = useState(1);
       const [pageAsig, setPageAsig] = useState(1);
       const pageSize = 50;
+
+      const hasDerived = !!(derived && Array.isArray(derived.rowsArea));
+      const hasDerivedAsig = !!(derived && Array.isArray(derived.rowsAsignatura));
+      const hasDerivedKPIs = !!(derived && Array.isArray(derived.rowsArea) && derived.promGeneral != null && derived.estadoCounts && Array.isArray(derived.areaRiesgo));
+      console.debug('[DashboardView] KPIs: using derived?', hasDerivedKPIs);
+      const hasActiveFilters = !!(courseFilterDV !== 'ALL' || studentFilter || areaFilter || asigFilter || estadoFilter);
 
       const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.__course), [data]);
 
@@ -1089,11 +1096,10 @@
       useEffect(() => {
         setPageAreas(1);
         setPageAsig(1);
-      }, [dataForAnalysis, studentFilter, areaFilter, asigFilter, estadoFilter]);
+      }, [courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter]);
 
       console.debug('[DashboardView] subtab', subtab, {pageAreas, pageAsig});
-      console.debug('[DashboardView] memo recompute', {courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter});
-
+      
       const studentList = useMemo(() => Array.from(new Set(dataForAnalysis.map(s => s.name))), [dataForAnalysis]);
       const areaList = useMemo(() => Array.from(new Set(dataForAnalysis.flatMap(s => Object.keys(s.areas)))), [dataForAnalysis]);
       const asigList = useMemo(() => Array.from(new Set(dataForAnalysis.flatMap(s => Object.values(s.areas).flatMap(a => Object.keys(a.asignaturas))))), [dataForAnalysis]);
@@ -1109,61 +1115,122 @@
         return '';
       };
 
-      const filteredRowsAsignatura = useMemo(() => {
-        const filtered = [];
-        dataForAnalysis.forEach(st => {
+      const rowsAreaSource = useMemo(() => {
+        if (hasDerived) {
+          return derived.rowsArea;
+        }
+        // Fallback
+        if (!Array.isArray(data)) return [];
+        const fallbackRows = [];
+        data.forEach(st => {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
-            Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
-              const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
-              const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
-              const matchAsig = !asigFilter || asigName.toLowerCase().includes(asigFilter.toLowerCase()) || asigName === asigFilter;
-              const matchEstado = !estadoFilter || (asigData.estado?.text && (asigData.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || asigData.estado.text === estadoFilter));
-              if (matchStudent && matchArea && matchAsig && matchEstado) {
-                filtered.push({
-                  id: `${st.id}-${areaName}-${asigName}`, __course: st.__course, estudiante: st.name, area: areaName, asignatura: asigName,
-                  p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
-                  promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
-                });
-              }
+            fallbackRows.push({
+              id: `${st.id}-${areaName}`, __course: st.__course, estudiante: st.name, area: areaName,
+              defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
             });
           });
         });
-        return filtered;
-      }, [dataForAnalysis, studentFilter, areaFilter, asigFilter, estadoFilter]);
+        return fallbackRows;
+      }, [data, hasDerived, derived?.rowsArea]);
+
+      const rowsAreaByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAreaSource;
+        return rowsAreaSource.filter(r => (r.__course || '') === courseFilterDV);
+      }, [rowsAreaSource, courseFilterDV]);
 
       const filteredRowsArea = useMemo(() => {
-        const filtered = [];
-        dataForAnalysis.forEach(st => {
+        if (!rowsAreaByCourse) return [];
+        return rowsAreaByCourse.filter(row => {
+            const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
+            const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+            return matchStudent && matchArea && matchEstado;
+        });
+      }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
+
+      const rowsAsigSource = useMemo(() => {
+        if (hasDerivedAsig) {
+          return derived.rowsAsignatura;
+        }
+        // Fallback
+        if (!Array.isArray(data)) return [];
+        const fallbackRows = [];
+        data.forEach(st => {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
-            const matchStudent = !studentFilter || st.name.toLowerCase().includes(studentFilter.toLowerCase());
-            const matchArea = !areaFilter || areaName.toLowerCase().includes(areaFilter.toLowerCase()) || areaName === areaFilter;
-            const matchEstado = !estadoFilter || (areaData.areaStats?.estado?.text && (areaData.areaStats.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || areaData.areaStats.estado.text === estadoFilter));
-            if (matchStudent && matchArea && matchEstado) {
-              filtered.push({
-                id: `${st.id}-${areaName}`, __course: st.__course, estudiante: st.name, area: areaName,
-                defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
-                promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
+            Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
+              fallbackRows.push({
+                id: `${st.id}-${areaName}-${asigName}`, __course: st.__course, estudiante: st.name, area: areaName, asignatura: asigName,
+                p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
+                promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
               });
-            }
+            });
           });
         });
-        return filtered;
-      }, [dataForAnalysis, studentFilter, areaFilter, estadoFilter]);
+        return fallbackRows;
+      }, [data, hasDerivedAsig, derived?.rowsAsignatura]);
 
-      const pagedRowsAsignatura = useMemo(() => {
-          const start = (pageAsig - 1) * pageSize;
-          return filteredRowsAsignatura.slice(start, start + pageSize);
-      }, [filteredRowsAsignatura, pageAsig]);
+      const rowsAsigByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAsigSource;
+        return rowsAsigSource.filter(r => (r.__course || '') === courseFilterDV);
+      }, [rowsAsigSource, courseFilterDV]);
 
-      const pagedRowsArea = useMemo(() => {
-          const start = (pageAreas - 1) * pageSize;
-          return filteredRowsArea.slice(start, start + pageSize);
-      }, [filteredRowsArea, pageAreas]);
+      const filteredRowsAsignatura = useMemo(() => {
+        if (!rowsAsigByCourse) return [];
+        return rowsAsigByCourse.filter(row => {
+          const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
+          const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
+          const matchAsig = !asigFilter || row.asignatura.toLowerCase().includes(asigFilter.toLowerCase()) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+          return matchStudent && matchArea && matchAsig && matchEstado;
+        });
+      }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
 
-      const totalPagesAsig = Math.ceil(filteredRowsAsignatura.length / pageSize);
-      const totalPagesAreas = Math.ceil(filteredRowsArea.length / pageSize);
+      const kpisBase = useMemo(() => {
+        if (hasDerivedKPIs && !hasActiveFilters) {
+          const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
+          const estadoCountsArray = estados.map(e => derived.estadoCounts[e] || 0);
+          return { promGeneral: derived.promGeneral.toFixed(2), estadoCounts: estadoCountsArray, areaRiesgo: derived.areaRiesgo, estados };
+        }
+        return null;
+      }, [hasDerivedKPIs, hasActiveFilters, derived]);
 
-      const { promGeneral, estadoCounts, areaRiesgo, estados } = useMemo(() => {
+      const kpisFiltered = useMemo(() => {
+        if (!hasActiveFilters) return null;
+        const areaRows = filteredRowsArea || [];
+        const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
+
+        const proms = areaRows.map(r => r.promActual).filter(v => typeof v === 'number' && !isNaN(v));
+        const promGeneral = proms.length ? (proms.reduce((a,b)=>a+b,0)/proms.length).toFixed(2) : 'N/A';
+
+        const byStudent = new Map();
+        for (const r of areaRows) {
+          const e = r.estado?.text; const name = r.estudiante;
+          if (!name || !e) continue;
+          if (!byStudent.has(name)) byStudent.set(name, new Set());
+          if (estados.includes(e)) byStudent.get(name).add(e);
+        }
+        const estadoCountsObj = Object.fromEntries(estados.map(s => [s, 0]));
+        for (const set of byStudent.values()) for (const s of set) estadoCountsObj[s]++;
+        const estadoCounts = estados.map(e => estadoCountsObj[e]);
+
+        const total = new Set(areaRows.map(r => r.estudiante)).size;
+        const agg = new Map();
+        for (const r of areaRows) {
+          const a = r.area; const e = r.estado?.text;
+          if (!a) continue;
+          if (!agg.has(a)) agg.set(a, {enRiesgo:0, reprobados:0});
+          const obj = agg.get(a);
+          if (e === 'En riesgo') obj.enRiesgo++;
+          if (e === 'Perdido') obj.reprobados++;
+        }
+        const areaRiesgo = Array.from(agg.entries()).map(([area, v]) => ({ area, enRiesgo: v.enRiesgo, reprobados: v.reprobados, total })).filter(a => a.enRiesgo > 0 || a.reprobados > 0);
+
+        return { promGeneral, estadoCounts, areaRiesgo, estados };
+      }, [hasActiveFilters, filteredRowsArea]);
+
+      const kpisFallback = useMemo(() => {
+        if (hasDerivedKPIs || hasActiveFilters) return null;
         const allProms = dataForAnalysis.flatMap(st => Object.values(st.areas).map(a => a.areaStats?.promedioActual).filter(v => typeof v === 'number'));
         const promGeneral = allProms.length ? (allProms.reduce((s,v)=>s+v,0)/allProms.length).toFixed(2) : 'N/A';
         const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
@@ -1176,7 +1243,24 @@
           return { area: a, enRiesgo, reprobados, total };
         }).filter(a => a.enRiesgo > 0 || a.reprobados > 0);
         return { promGeneral, estadoCounts, areaRiesgo, estados };
-      }, [dataForAnalysis]);
+      }, [dataForAnalysis, hasDerivedKPIs, hasActiveFilters]);
+
+      const { promGeneral, estadoCounts, areaRiesgo, estados } = kpisBase || kpisFiltered || kpisFallback || { promGeneral: 'N/A', estadoCounts: [0,0,0,0,0], areaRiesgo: [], estados: ['Perdido','En riesgo','Recuperable','Ganable','Ganado'] };
+      
+      console.debug('[DashboardView] KPIs source', kpisBase ? 'derived' : kpisFiltered ? 'filtered-derived' : 'fallback');
+
+      const pagedRowsAsignatura = useMemo(() => {
+          const start = (pageAsig - 1) * pageSize;
+          return filteredRowsAsignatura.slice(start, start + pageSize);
+      }, [filteredRowsAsignatura, pageAsig]);
+
+      const pagedRowsArea = useMemo(() => {
+          const start = (pageAreas - 1) * pageSize;
+          return filteredRowsArea.slice(start, start + pageSize);
+      }, [filteredRowsArea, pageAreas, pageSize]);
+
+      const totalPagesAsig = Math.ceil(filteredRowsAsignatura.length / pageSize);
+      const totalPagesAreas = Math.ceil(filteredRowsArea.length / pageSize);
 
       useEffect(() => {
         console.timeEnd('render:DashboardView');
@@ -1909,6 +1993,8 @@
         return analysisData;
       }, [courses, selectedCourse, analysisData]);
 
+      
+
       return (
         <div>
           {view==='upload' && (
@@ -2014,7 +2100,7 @@
                 }}
               />
             </div>
-            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} />
+            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
               <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>              <hr className="my-6"/>
               <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
