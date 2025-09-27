@@ -4,6 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Académico Consolidado</title>
+
+<script>
+/** Hito 2 (C) – Modo global determinista para todo el documento
+ *  Regla: ?mode=prod fuerza PRODUCCIÓN; ?mode=dev fuerza DESARROLLO.
+ *  Si no hay query param y window.__PROD__ ya estaba definido, se respeta.
+ *  Efecto: fija window.__PROD__ y data-mode en <html> para CSS/JS.
+ */
+(function () {
+  var params = new URLSearchParams(location.search);
+  var qp = (params.get("mode") || "").toLowerCase();
+
+  if (qp === "prod")      window.__PROD__ = true;
+  else if (qp === "dev")  window.__PROD__ = false;
+  else if (typeof window.__PROD__ === "undefined") {
+    window.__PROD__ = false; // por defecto, desarrollo
+  }
+
+  // Señal visible y utilizable por CSS/JS
+  var mode = window.__PROD__ ? "prod" : "dev";
+  document.documentElement.dataset.mode = mode;
+
+  // Si activas __DASH_DEV__, muestra un aviso útil
+  if (window.__DASH_DEV__) {
+    console.log("[MODE]", "Aplicación en modo:", mode.toUpperCase());
+  }
+})();
+</script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React + ReactDOM + Babel -->
