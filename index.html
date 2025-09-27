@@ -1183,17 +1183,17 @@ if (!window.__DASH_PROF_PATCHED__) {
       console.debug('[DashboardView] KPIs: using derived?', hasDerivedKPIs);
       const hasActiveFilters = !!(courseFilterDV !== 'ALL' || studentFilter || areaFilter || asigFilter || estadoFilter);
 
-      const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.__course), [data]);
+      const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.CURSO), [data]);
 
       const courseOptionsDV = useMemo(() => {
-        const set = new Set(Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []);
+        const set = new Set(Array.isArray(data) ? data.map(s => s?.CURSO).filter(Boolean) : []);
         return ['ALL', ...Array.from(set)];
       }, [data]);
 
       const dataForAnalysis = useMemo(() => {
         if (!Array.isArray(data)) return [];
         if (courseFilterDV === 'ALL') return data;
-        return data.filter(s => (s?.__course || '') === courseFilterDV);
+        return data.filter(s => (s?.CURSO || '') === courseFilterDV);
       }, [data, courseFilterDV]);
 
       useEffect(() => {
@@ -1228,7 +1228,7 @@ if (!window.__DASH_PROF_PATCHED__) {
         data.forEach(st => {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
             fallbackRows.push({
-              id: `${st.id}-${areaName}`, __course: st.__course, estudiante: st.name, area: areaName,
+              id: `${st.id}-${areaName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName,
               defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
               promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
             });
@@ -1239,7 +1239,7 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const rowsAreaByCourse = useMemo(() => {
         if (courseFilterDV === 'ALL') return rowsAreaSource;
-        return rowsAreaSource.filter(r => (r.__course || '') === courseFilterDV);
+        return rowsAreaSource.filter(r => (r.CURSO || '') === courseFilterDV);
       }, [rowsAreaSource, courseFilterDV]);
 
       const filteredRowsArea = useMemo(() => {
@@ -1263,7 +1263,7 @@ if (!window.__DASH_PROF_PATCHED__) {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
             Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
               fallbackRows.push({
-                id: `${st.id}-${areaName}-${asigName}`, __course: st.__course, estudiante: st.name, area: areaName, asignatura: asigName,
+                id: `${st.id}-${areaName}-${asigName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName, asignatura: asigName,
                 p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
                 promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
               });
@@ -1275,7 +1275,7 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const rowsAsigByCourse = useMemo(() => {
         if (courseFilterDV === 'ALL') return rowsAsigSource;
-        return rowsAsigSource.filter(r => (r.__course || '') === courseFilterDV);
+        return rowsAsigSource.filter(r => (r.CURSO || '') === courseFilterDV);
       }, [rowsAsigSource, courseFilterDV]);
 
       const filteredRowsAsignatura = useMemo(() => {
@@ -1511,8 +1511,8 @@ if (!window.__DASH_PROF_PATCHED__) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsAsignatura.map(row => (
-                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                           <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
@@ -1557,8 +1557,8 @@ if (!window.__DASH_PROF_PATCHED__) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsArea.map(row => (
-                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                           <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
@@ -1727,6 +1727,24 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       // Pequeño "yield" para permitir pintar la UI entre pasos pesados
       const uiTick = () => new Promise(r => setTimeout(r, 0));
+
+      // [Fix-CURSO] helper central: garantiza r.CURSO consistente
+      function withCurso(rows) {
+        const norm = (v) => (v == null ? '' : String(v).trim());
+        return (rows || []).map((r) => {
+          const c =
+            (r.CURSO ??
+            r.curso ??
+            r.Curso ??
+            r.course ??
+            r.COD_CURSO ??
+            r.cod_curso ??
+            (r.meta && (r.meta.CURSO || r.meta.curso))) ||
+            '';
+          const v = norm(c);
+          return v ? (r.CURSO ? r : { ...r, CURSO: v }) : { ...r, CURSO: 'SIN_CURSO' };
+        });
+      }
 
       const buildDerived = (dataset) => {
         if (!Array.isArray(dataset) || dataset.length === 0) {
@@ -2006,16 +2024,23 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nextSelected = mergedCourses.length > 1 ? 'ALL' : mergedCourses[0].name;
         setSelectedCourse(nextSelected);
 
-        const nextData = nextSelected === 'ALL'
-          ? mergedCourses.flatMap(c => c.data)
-          : mergedCourses[0].data;
+        const nextData = mergedCourses.flatMap(c => c.data.map(s => ({ ...s, CURSO: c.name })));
 
         setAnalysisData(nextData);
 
         const d = buildDerived(nextData);
-        setDerived(d);
-        console.debug('[App] derived built (areas)', { rowsArea: d?.rowsArea?.length });
-        console.debug('[App] derived built (asignaturas)', { rowsAsignatura: d?.rowsAsignatura?.length });
+        
+        const rowsAreaNorm = withCurso(d.rowsArea);
+        const rowsAsignNorm = withCurso(d.rowsAsignatura);
+
+        const derivedNorm = {
+          ...d,
+          rowsArea: rowsAreaNorm,
+          rowsAsignatura: rowsAsignNorm,
+        };
+        setDerived(derivedNorm);
+        console.debug('[App] derived built (areas)', { rowsArea: derivedNorm?.rowsArea?.length });
+        console.debug('[App] derived built (asignaturas)', { rowsAsignatura: derivedNorm?.rowsAsignatura?.length });
         console.debug('[App] derived built (indices)', { students: d.studentList.length, areas: d.areaList.length, asigs: d.asigList.length, courses: d.courseList.length });
         console.debug('[App] derived built (kpis)', { promGeneral: d.promGeneral, estadoCounts: d.estadoCounts, areaRiesgo: d.areaRiesgo.length });
 
@@ -2099,7 +2124,7 @@ if (!window.__DASH_PROF_PATCHED__) {
           return courses.find(c => c.name === selectedCourse)?.data ?? analysisData;
         }
         if (courses.length > 0) {
-          return courses.flatMap(c => c.data.map(s => ({ ...s, __course: c.name })));
+          return courses.flatMap(c => c.data.map(s => ({ ...s, CURSO: c.name })));
         }
         return analysisData;
       }, [courses, selectedCourse, analysisData]);
