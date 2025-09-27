@@ -111,6 +111,50 @@
     })();
   </script>
   <script type="text/babel">
+/** =========================================
+ * Hito 1 (B): Flag DEV + DBG + profiling seguro
+ * Producción silenciosa por defecto.
+ * Para activar depuración en runtime:
+ *   window.__DASH_DEV__ = true
+ * ========================================= */
+window.__DASH_DEV__ = window.__DASH_DEV__ ?? false;
+
+// Evita aplicar el parche más de una vez
+if (!window.__DASH_PROF_PATCHED__) {
+  window.__DASH_PROF_PATCHED__ = true;
+
+  // Helper de depuración controlado por flag
+  window.DBG = (...args) => {
+    if (window.__DASH_DEV__) console.log('[DBG]', ...args);
+  };
+
+  // Profiling sin "Timer already exists", dev-only
+  (function () {
+    const timers = new Map();
+    const origLog = console.log.bind(console);
+
+    const origTime = console.time?.bind(console);
+    const origTimeEnd = console.timeEnd?.bind(console);
+
+    console.time = (label = 'default') => {
+      if (!window.__DASH_DEV__) return;        // no-op en prod
+      if (timers.has(label)) return;           // evita timers duplicados
+      timers.set(label, performance.now());
+    };
+
+    console.timeEnd = (label = 'default') => {
+      if (!window.__DASH_DEV__) return;        // no-op en prod
+      const start = timers.get(label);
+      if (start == null) {
+        origLog('[DBG] timeEnd sin time previo:', label);
+        return;
+      }
+      const dur = performance.now() - start;
+      timers.delete(label);
+      origLog(`[time] ${label}: ${dur.toFixed(1)}ms`);
+    };
+  })();
+}
     // ...existing imports and code...
 
     // =============================
