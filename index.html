@@ -246,7 +246,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // Componente de Gráficos (Chart.js)
     // =============================
-    function DashboardCharts({ data }) {
+    function DashboardCharts({ rowsArea, rowsAsignatura }) {
       console.time('render:DashboardCharts');
       const barRef = useRef(null);
       const pieRef = useRef(null);
@@ -254,21 +254,38 @@ if (!window.__DASH_PROF_PATCHED__) {
       const charts = useRef({});
 
       const chartData = useMemo(() => {
+        const data = rowsArea || [];
         if (!Array.isArray(data)) {
           return { estados: [], estadoCounts: [], areaLabels: [], areaProms: [] };
         }
         const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-        const estadoCounts = estados.map(e =>
-          data.filter(est => Object.values(est.areas).some(a => a.areaStats?.estado?.text === e)).length
-        );
-        const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+        
+        const studentStates = new Map();
+        data.forEach(r => {
+          if (r.estado && r.estado.text && r.estudiante) {
+            if (!studentStates.has(r.estudiante)) {
+              studentStates.set(r.estudiante, new Set());
+            }
+            studentStates.get(r.estudiante).add(r.estado.text);
+          }
+        });
+
+        const estadoCounts = { Perdido: 0, 'En riesgo': 0, Recuperable: 0, Ganable: 0, Ganado: 0 };
+        studentStates.forEach(stateSet => {
+          stateSet.forEach(s => {
+            if (estadoCounts.hasOwnProperty(s)) estadoCounts[s]++;
+          });
+        });
+
+        const areaLabels = Array.from(new Set(data.map(s => s.area)));
         const areaProms = areaLabels.map(a => {
-          const arr = data.flatMap(s => s.areas[a]?.areaStats?.promedioActual ?? []);
+          const arr = data.filter(s => s.area === a).map(s => s.promActual);
           const nums = arr.filter(v => typeof v === 'number');
           return nums.length ? Number((nums.reduce((s,v)=>s+v,0)/nums.length).toFixed(2)) : 0;
         });
-        return { estados, estadoCounts, areaLabels, areaProms };
-      }, [data]);
+
+        return { estados, estadoCounts: estados.map(e => estadoCounts[e]), areaLabels, areaProms };
+      }, [rowsArea]);
 
       useEffect(() => {
         if (!chartData) return;
@@ -394,9 +411,97 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
     // =============================
-    function DashboardTabs({ dashboardData, onReset, fileName, derived }) {
+    function DashboardTabs({ dashboardData, onReset, fileName, derived, syncChartsWithFilters, setSyncChartsWithFilters }) {
       console.debug('[Tabs] received derived', { has: !!derived, rowsArea: Array.isArray(derived?.rowsArea) ? derived.rowsArea.length : 'NA' });
       const [tab, setTab] = useState('analisis');
+
+      // LIFTED STATE from DashboardView
+      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
+      const [studentFilter, setStudentFilter] = useState('');
+      const [areaFilter, setAreaFilter] = useState('');
+      const [asigFilter, setAsigFilter] = useState('');
+      const [estadoFilter, setEstadoFilter] = useState('');
+
+      const dataForAnalysis = useMemo(() => {
+        if (!Array.isArray(dashboardData)) return [];
+        if (courseFilterDV === 'ALL') return dashboardData;
+        return dashboardData.filter(s => (s?.CURSO || '') === courseFilterDV);
+      }, [dashboardData, courseFilterDV]);
+
+      const rowsAreaSource = useMemo(() => {
+        if (derived && Array.isArray(derived.rowsArea)) {
+          return derived.rowsArea;
+        }
+        // Fallback
+        if (!Array.isArray(dataForAnalysis)) return [];
+        const fallbackRows = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
+            fallbackRows.push({
+              id: `${st.id}-${areaName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName,
+              defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
+            });
+          });
+        });
+        return fallbackRows;
+      }, [dataForAnalysis, derived?.rowsArea]);
+
+      const rowsAsigSource = useMemo(() => {
+        if (derived && Array.isArray(derived.rowsAsignatura)) {
+          return derived.rowsAsignatura;
+        }
+        // Fallback
+        if (!Array.isArray(dataForAnalysis)) return [];
+        const fallbackRows = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
+            Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
+              fallbackRows.push({
+                id: `${st.id}-${areaName}-${asigName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName, asignatura: asigName,
+                p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
+                promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
+              });
+            });
+          });
+        });
+        return fallbackRows;
+      }, [dataForAnalysis, derived?.rowsAsignatura]);
+
+      const rowsAreaByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAreaSource;
+        return rowsAreaSource.filter(r => (r.CURSO || '') === courseFilterDV);
+      }, [rowsAreaSource, courseFilterDV]);
+
+      const filteredRowsArea = useMemo(() => {
+        if (!rowsAreaByCourse) return [];
+        return rowsAreaByCourse.filter(row => {
+            const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
+            const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+            return matchStudent && matchArea && matchEstado;
+        });
+      }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
+
+      const rowsAsigByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAsigSource;
+        return rowsAsigSource.filter(r => (r.CURSO || '') === courseFilterDV);
+      }, [rowsAsigSource, courseFilterDV]);
+
+      const filteredRowsAsignatura = useMemo(() => {
+        if (!rowsAsigByCourse) return [];
+        return rowsAsigByCourse.filter(row => {
+          const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
+          const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
+          const matchAsig = !asigFilter || row.asignatura.toLowerCase().includes(asigFilter.toLowerCase()) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+          return matchStudent && matchArea && matchAsig && matchEstado;
+        });
+      }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
+
+      // [ChartsSync] fuentes de datos para gráficos
+      const chartRowsArea = syncChartsWithFilters ? filteredRowsArea : rowsAreaSource;
+      const chartRowsAsig = syncChartsWithFilters ? filteredRowsAsignatura : rowsAsigSource;
 
       return (
         <div className="w-full">
@@ -444,12 +549,36 @@ if (!window.__DASH_PROF_PATCHED__) {
           <div className="bg-white rounded-lg shadow p-4">
             {tab === 'analisis' && (
               <div role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis">
-                <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} derived={derived} />
+                <DashboardView
+                  data={dataForAnalysis}
+                  onReset={onReset}
+                  fileName={fileName}
+                  derived={derived}
+                  // Pass down lifted state and setters
+                  filters={{ courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter }}
+                  setFilters={{ setCourseFilterDV, setStudentFilter, setAreaFilter, setAsigFilter, setEstadoFilter }}
+                  // Pass down calculated rows
+                  filteredRowsArea={filteredRowsArea}
+                  filteredRowsAsignatura={filteredRowsAsignatura}
+                />
               </div>
             )}
             {tab === 'graficos' && (
               <div role="tabpanel" id="panel-graficos" aria-labelledby="tab-graficos">
-                <DashboardCharts data={dashboardData} />
+                {/* [ChartsSync] toggle en UI de Gráficos */}
+                <div className="flex justify-end mb-4">
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox"
+                          className="rounded"
+                          checked={syncChartsWithFilters}
+                          onChange={e => setSyncChartsWithFilters(e.target.checked)} />
+                    Sincronizar con filtros de Análisis
+                  </label>
+                </div>
+                <DashboardCharts
+                  rowsArea={chartRowsArea}
+                  rowsAsignatura={chartRowsAsig}
+                />
               </div>
             )}
             {tab === 'consultas' && (
@@ -471,7 +600,7 @@ if (!window.__DASH_PROF_PATCHED__) {
       const courseOptions = useMemo(() => {
         if (!Array.isArray(data)) return ['ALL'];
         // [Fix-CURSO] conjunto de cursos consistente
-        const getCurso = (r) => r.CURSO ?? r.curso ?? r.__course;
+        const getCurso = (r) => r.CURSO ?? r.curso;
         const set = new Set(data.map(getCurso).filter(Boolean));
         return ['ALL', ...Array.from(set)];
       }, [data]);
@@ -479,7 +608,7 @@ if (!window.__DASH_PROF_PATCHED__) {
       const filteredData = useMemo(() => {
         if (!Array.isArray(data)) return [];
         if (courseFilter === 'ALL') return data;
-        return data.filter(s => (s.CURSO ?? s.curso ?? s.__course) === courseFilter);
+        return data.filter(s => (s.CURSO ?? s.curso) === courseFilter);
       }, [data, courseFilter]);
 
       const areaLabels = useMemo(() => Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas)))), [filteredData]);
