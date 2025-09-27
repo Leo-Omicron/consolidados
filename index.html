@@ -7,8 +7,66 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React + ReactDOM + Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- BACKUP (rollback rápido):
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+-->
+
+<!-- BACKUP (rollback rápido) del switch previo con createElement(...) -->
+<!--
+<script>
+/** Hito 2 (C) – Switch Dev/Prod (React/ReactDOM UMD) sin romper Babel ni la app
+ *  Modo por defecto: DEV. Forzar PROD con ?mode=prod o window.__PROD__=true.
+ *  No tocar Babel por ahora (se mantiene para garantizar estabilidad).
+ */
+(function () {
+  var REACT_DEV = "https://unpkg.com/react@18/umd/react.development.js";       // URL exacta previa (development.js)
+  var REACTDOM_DEV = "https://unpkg.com/react-dom@18/umd/react-dom.development.js"; // URL exacta previa (development.js)
+
+  // Derivar URLs de producción cambiando "development.js" por "production.min.js"
+  var REACT_PROD = REACT_DEV.replace("development.js", "production.min.js");
+  var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
+
+  var params = new URLSearchParams(location.search);
+  var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
+
+  function inject(src) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.defer = false; // mantener orden de carga
+    document.head.appendChild(s);
+  }
+
+  inject(isProd ? REACT_PROD : REACT_DEV);
+  inject(isProd ? REACTDOM_PROD : REACTDOM_DEV);
+})();
+</script>
+-->
+
+<!-- Hito 2 (C) – Switch Dev/Prod SÍNCRONO para garantizar React antes de Babel -->
+<script>
+  (function () {
+    // Pega aquí las URLs *development* EXACTAS que usabas antes:
+    var REACT_DEV     = "https://unpkg.com/react@18/umd/react.development.js";      // .../react.development.js
+    var REACTDOM_DEV  = "https://unpkg.com/react-dom@18/umd/react-dom.development.js";   // .../react-dom.development.js
+
+    // Deriva automáticamente las URLs de producción:
+    var REACT_PROD    = REACT_DEV.replace("development.js", "production.min.js");
+    var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
+
+    var params = new URLSearchParams(location.search);
+    var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
+
+    // Inyección SINCRÓNICA (durante el parseo) para bloquear hasta que React esté disponible
+    var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '"><' + '/script>';
+    var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_PROD) + '"><' + '/script>';
+    // ⚠️ Nota: r2 usa REACTDOM_PROD/DEV correctamente:
+    r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '"><' + '/script>';
+
+    document.write(r1);
+    document.write(r2);
+  })();
+</script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -383,16 +441,17 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [courseFilter, setCourseFilter] = useState('ALL');
 
       const courseOptions = useMemo(() => {
-        const set = new Set(
-          Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []
-        );
+        if (!Array.isArray(data)) return ['ALL'];
+        // [Fix-CURSO] conjunto de cursos consistente
+        const getCurso = (r) => r.CURSO ?? r.curso ?? r.__course;
+        const set = new Set(data.map(getCurso).filter(Boolean));
         return ['ALL', ...Array.from(set)];
       }, [data]);
 
       const filteredData = useMemo(() => {
         if (!Array.isArray(data)) return [];
         if (courseFilter === 'ALL') return data;
-        return data.filter(s => s.__course === courseFilter);
+        return data.filter(s => (s.CURSO ?? s.curso ?? s.__course) === courseFilter);
       }, [data, courseFilter]);
 
       const areaLabels = useMemo(() => Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas)))), [filteredData]);
@@ -581,7 +640,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     const textNormalize = (v) => (typeof v === 'string' ? v.trim() : v);
     const toUpperSafe = (v) => (v == null ? '' : String(v).trim().toUpperCase());
 
-    const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
     const normalizeName = (s) => {
       let v = toUpperSafe(s);
@@ -1675,35 +1734,43 @@ if (!window.__DASH_PROF_PATCHED__) {
         }
 
         const rowsArea = dataset.flatMap(st =>
-          Object.entries(st.areas).map(([areaName, areaData]) => ({
-            id: `${st.id}-${areaName}`,
-            __course: st.__course,
-            estudiante: st.name,
-            area: areaName,
-            defP1: areaData.DEF?.P1,
-            defP2: areaData.DEF?.P2,
-            defP3: areaData.DEF?.P3,
-            promActual: areaData.areaStats?.promedioActual,
-            p4Min: areaData.areaStats?.p4Min,
-            estado: areaData.areaStats?.estado,
-          }))
+          Object.entries(st.areas).map(([areaName, areaData]) => {
+            // [Fix-CURSO] normalización defensiva del curso
+            const _curso = st.CURSO ?? st.curso ?? st.Curso ?? st.__course ?? 'SIN_CURSO';
+            return {
+              id: `${st.id}-${areaName}`,
+              CURSO: _curso,
+              estudiante: st.name,
+              area: areaName,
+              defP1: areaData.DEF?.P1,
+              defP2: areaData.DEF?.P2,
+              defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual,
+              p4Min: areaData.areaStats?.p4Min,
+              estado: areaData.areaStats?.estado,
+            };
+          })
         );
 
         const rowsAsignatura = dataset.flatMap(st =>
           Object.entries(st.areas).flatMap(([areaName, areaData]) =>
-            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => ({
-              id: `${st.id}-${areaName}-${asigName}`,
-              __course: st.__course,
-              estudiante: st.name,
-              area: areaName,
-              asignatura: asigName,
-              p1: asigData.P1,
-              p2: asigData.P2,
-              p3: asigData.P3,
-              promActual: asigData.promedioActual,
-              p4Min: asigData.p4Min,
-              estado: asigData.estado,
-            }))
+            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => {
+              // [Fix-CURSO] normalización defensiva del curso
+              const _curso = st.CURSO ?? st.curso ?? st.Curso ?? st.__course ?? 'SIN_CURSO';
+              return {
+                id: `${st.id}-${areaName}-${asigName}`,
+                CURSO: _curso,
+                estudiante: st.name,
+                area: areaName,
+                asignatura: asigName,
+                p1: asigData.P1,
+                p2: asigData.P2,
+                p3: asigData.P3,
+                promActual: asigData.promedioActual,
+                p4Min: asigData.p4Min,
+                estado: asigData.estado,
+              };
+            })
           )
         );
 
