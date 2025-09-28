@@ -552,8 +552,8 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nArea = normTxt(areaFilter);
         const nEstado = normTxt(estadoFilter);
         return rowsAreaByCourse.filter(row => {
-            const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
-            const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+            const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+            const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
             const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
             return matchStudent && matchArea && matchEstado;
         });
@@ -571,9 +571,9 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nAsig = normTxt(asigFilter);
         const nEstado = normTxt(estadoFilter);
         return rowsAsigByCourse.filter(row => {
-          const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
-          const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
-          const matchAsig = !asigFilter || normTxt(row.asignatura).includes(nAsig) || row.asignatura === asigFilter;
+          const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+          const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || (row.ASIG_NORM ?? normTxt(row.asignatura)).includes(nAsig) || row.asignatura === asigFilter;
           const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
           return matchStudent && matchArea && matchAsig && matchEstado;
         });
@@ -1494,8 +1494,8 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nArea = normTxt(areaFilter);
         const nEstado = normTxt(estadoFilter);
         return rowsAreaByCourse.filter(row => {
-            const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
-            const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+            const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+            const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
             const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
             return matchStudent && matchArea && matchEstado;
         });
@@ -1534,9 +1534,9 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nAsig = normTxt(asigFilter);
         const nEstado = normTxt(estadoFilter);
         return rowsAsigByCourse.filter(row => {
-          const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
-          const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
-          const matchAsig = !asigFilter || normTxt(row.asignatura).includes(nAsig) || row.asignatura === asigFilter;
+          const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+          const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || (row.ASIG_NORM ?? normTxt(row.asignatura)).includes(nAsig) || row.asignatura === asigFilter;
           const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
           return matchStudent && matchArea && matchAsig && matchEstado;
         });
@@ -2028,6 +2028,10 @@ if (!window.__DASH_PROF_PATCHED__) {
               promActual: areaData.areaStats?.promedioActual,
               p4Min: areaData.areaStats?.p4Min,
               estado: areaData.areaStats?.estado,
+              // [PreNorm] campos normalizados para búsquedas/filtrado
+              CURSO_NORM: normTxt(_curso),
+              AREA_NORM:  normTxt(areaName),
+              EST_NORM:   normTxt(st.name),
             };
           })
         );
@@ -2049,6 +2053,11 @@ if (!window.__DASH_PROF_PATCHED__) {
                 promActual: asigData.promedioActual,
                 p4Min: asigData.p4Min,
                 estado: asigData.estado,
+                // [PreNorm] campos normalizados para búsquedas/filtrado
+                CURSO_NORM: normTxt(_curso),
+                AREA_NORM:  normTxt(areaName),
+                ASIG_NORM:  normTxt(asigName),
+                EST_NORM:   normTxt(st.name),
               };
             })
           )
