@@ -4,14 +4,97 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Académico Consolidado</title>
+
+<script>
+/** Hito 2 (C) – Modo global determinista para todo el documento
+ *  Regla: ?mode=prod fuerza PRODUCCIÓN; ?mode=dev fuerza DESARROLLO.
+ *  Si no hay query param y window.__PROD__ ya estaba definido, se respeta.
+ *  Efecto: fija window.__PROD__ y data-mode en <html> para CSS/JS.
+ */
+(function () {
+  var params = new URLSearchParams(location.search);
+  var qp = (params.get("mode") || "").toLowerCase();
+
+  if (qp === "prod")      window.__PROD__ = true;
+  else if (qp === "dev")  window.__PROD__ = false;
+  else if (typeof window.__PROD__ === "undefined") {
+    window.__PROD__ = false; // por defecto, desarrollo
+  }
+
+  // Señal visible y utilizable por CSS/JS
+  var mode = window.__PROD__ ? "prod" : "dev";
+  document.documentElement.dataset.mode = mode;
+
+  // Si activas __DASH_DEV__, muestra un aviso útil
+  if (window.__DASH_DEV__) {
+    console.log("[MODE]", "Aplicación en modo:", mode.toUpperCase());
+  }
+})();
+</script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React + ReactDOM + Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- BACKUP (rollback rápido):
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+-->
+
+<!-- BACKUP (rollback rápido) del switch previo con createElement(...) -->
+<!--
+<script>
+/** Hito 2 (C) – Switch Dev/Prod (React/ReactDOM UMD) sin romper Babel ni la app
+ *  Modo por defecto: DEV. Forzar PROD con ?mode=prod o window.__PROD__=true.
+ *  No tocar Babel por ahora (se mantiene para garantizar estabilidad).
+ */
+(function () {
+  var REACT_DEV = "https://unpkg.com/react@18/umd/react.development.js";       // URL exacta previa (development.js)
+  var REACTDOM_DEV = "https://unpkg.com/react-dom@18/umd/react-dom.development.js"; // URL exacta previa (development.js)
+
+  // Derivar URLs de producción cambiando "development.js" por "production.min.js"
+  var REACT_PROD = REACT_DEV.replace("development.js", "production.min.js");
+  var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
+
+  var params = new URLSearchParams(location.search);
+  var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
+
+  function inject(src) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.defer = false; // mantener orden de carga
+    document.head.appendChild(s);
+  }
+
+  inject(isProd ? REACT_PROD : REACT_DEV);
+  inject(isProd ? REACTDOM_PROD : REACTDOM_DEV);
+})();
+</script>
+-->
+
+<!-- Hito 2 (C) – Switch Dev/Prod SÍNCRONO para garantizar React antes de Babel -->
+<script>
+  (function () {
+    // Pega aquí las URLs *development* EXACTAS que usabas antes:
+    var REACT_DEV     = "https://unpkg.com/react@18/umd/react.development.js";      // .../react.development.js
+    var REACTDOM_DEV  = "https://unpkg.com/react-dom@18/umd/react-dom.development.js";   // .../react-dom.development.js
+
+    // Deriva automáticamente las URLs de producción:
+    var REACT_PROD    = REACT_DEV.replace("development.js", "production.min.js");
+    var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
+
+    var params = new URLSearchParams(location.search);
+    var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
+
+    // Inyección SINCRÓNICA con crossorigin (preparación SRI, sin cambiar URLs)
+    var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '" crossorigin="anonymous"><' + '/script>';
+    var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '" crossorigin="anonymous"><' + '/script>';
+    document.write(r1);
+    document.write(r2);
+  })();
+</script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
   <!-- Chart.js para gráficos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
   <script>
     // Flag persistente para silenciar errores externos en DEV
     (function () {
@@ -110,6 +193,61 @@
       };
     })();
   </script>
+<script>
+/** ResourceGuard – Diagnóstico de CDNs y aviso de fallos (no intrusivo)
+ *  - Loggea errores de recursos (CORS/SRI/bloqueos).
+ *  - Verifica que Tailwind esté aplicando estilos.
+ *  - Muestra un banner discreto si algo falla.
+ */
+(function () {
+  // Escucha errores de recursos (scripts/links)
+  window.addEventListener('error', function (e) {
+    var t = e.target || {};
+    var isRes = t.tagName === 'SCRIPT' || t.tagName === 'LINK';
+    if (!isRes) return;
+    var url = t.src || t.href || '(desconocido)';
+    console.warn('[ResourceGuard] Error cargando recurso:', t.tagName, url);
+    showBanner('No se pudo cargar un recurso: ' + url + '. Revisa conexión, CORS o SRI.');
+  }, true);
+
+  // Tras DOM listo, valida que Tailwind aplique clases utilitarias básicas
+  document.addEventListener('DOMContentLoaded', function () {
+    // Se usa un breve retraso para dar tiempo al script de Tailwind a escanear el DOM y aplicar estilos.
+    setTimeout(function() {
+      try {
+        var probe = document.createElement('div');
+        probe.className = 'hidden p-4';
+        document.body.appendChild(probe);
+        var cs = window.getComputedStyle(probe);
+        var okHidden = cs.display === 'none';
+        document.body.removeChild(probe);
+        if (!okHidden) {
+          console.warn('[ResourceGuard] Tailwind parece no estar activo (clase .hidden no aplicada).');
+          showBanner('Tailwind no se aplicó correctamente. Verifica la carga desde cdn.tailwindcss.com.');
+        }
+      } catch (err) {
+        console.warn('[ResourceGuard] Error verificando Tailwind:', err);
+      }
+    }, 500);
+  });
+
+  // Banner minimalista y removible
+  function showBanner(msg) {
+    if (document.getElementById('res-guard-banner')) return;
+    var b = document.createElement('div');
+    b.id = 'res-guard-banner';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;padding:10px;border-radius:8px;background:#111827;color:#F9FAFB;font:14px/1.4 system-ui,Segoe UI,Roboto;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    b.textContent = '⚠️ ' + msg + ' ';
+    var close = document.createElement('button');
+    close.textContent = 'Cerrar';
+    close.style.cssText = 'margin-left:8px;padding:4px 8px;border-radius:6px;border:1px solid #374151;background:#1F2937;color:#F3F4F6;cursor:pointer';
+    close.onclick = function () { b.remove(); };
+    b.appendChild(close);
+    document.body.appendChild(b);
+  }
+})();
+</script>
   <script type="text/babel">
 /** =========================================
  * Hito 1 (B): Flag DEV + DBG + profiling seguro
@@ -160,7 +298,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // Componente de Gráficos (Chart.js)
     // =============================
-    function DashboardCharts({ data }) {
+    function DashboardCharts({ rowsArea, rowsAsignatura }) {
       console.time('render:DashboardCharts');
       const barRef = useRef(null);
       const pieRef = useRef(null);
@@ -168,21 +306,38 @@ if (!window.__DASH_PROF_PATCHED__) {
       const charts = useRef({});
 
       const chartData = useMemo(() => {
+        const data = rowsArea || [];
         if (!Array.isArray(data)) {
           return { estados: [], estadoCounts: [], areaLabels: [], areaProms: [] };
         }
         const estados = ['Perdido','En riesgo','Recuperable','Ganable','Ganado'];
-        const estadoCounts = estados.map(e =>
-          data.filter(est => Object.values(est.areas).some(a => a.areaStats?.estado?.text === e)).length
-        );
-        const areaLabels = Array.from(new Set(data.flatMap(s => Object.keys(s.areas))));
+        
+        const studentStates = new Map();
+        data.forEach(r => {
+          if (r.estado && r.estado.text && r.estudiante) {
+            if (!studentStates.has(r.estudiante)) {
+              studentStates.set(r.estudiante, new Set());
+            }
+            studentStates.get(r.estudiante).add(r.estado.text);
+          }
+        });
+
+        const estadoCounts = { Perdido: 0, 'En riesgo': 0, Recuperable: 0, Ganable: 0, Ganado: 0 };
+        studentStates.forEach(stateSet => {
+          stateSet.forEach(s => {
+            if (estadoCounts.hasOwnProperty(s)) estadoCounts[s]++;
+          });
+        });
+
+        const areaLabels = Array.from(new Set(data.map(s => s.area)));
         const areaProms = areaLabels.map(a => {
-          const arr = data.flatMap(s => s.areas[a]?.areaStats?.promedioActual ?? []);
+          const arr = data.filter(s => s.area === a).map(s => s.promActual);
           const nums = arr.filter(v => typeof v === 'number');
           return nums.length ? Number((nums.reduce((s,v)=>s+v,0)/nums.length).toFixed(2)) : 0;
         });
-        return { estados, estadoCounts, areaLabels, areaProms };
-      }, [data]);
+
+        return { estados, estadoCounts: estados.map(e => estadoCounts[e]), areaLabels, areaProms };
+      }, [rowsArea]);
 
       useEffect(() => {
         if (!chartData) return;
@@ -308,18 +463,135 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
     // =============================
-    function DashboardTabs({ dashboardData, onReset, fileName, derived }) {
+        // [A11yTabs] manejo de teclas ← → Home End
+    function onTabListKeyDown(e) {
+      const LEFT = 'ArrowLeft', RIGHT = 'ArrowRight', HOME = 'Home', END = 'End';
+      const list = e.currentTarget;
+      const tabs = Array.from(list.querySelectorAll('[role="tab"]')).filter(el => !el.hasAttribute('disabled'));
+      const current = document.activeElement;
+      const idx = tabs.indexOf(current);
+      if (idx === -1) return;
+
+      let nextIdx = idx;
+      if (e.key === LEFT) nextIdx = (idx - 1 + tabs.length) % tabs.length;
+      else if (e.key === RIGHT) nextIdx = (idx + 1) % tabs.length;
+      else if (e.key === HOME) nextIdx = 0;
+      else if (e.key === END) nextIdx = tabs.length - 1;
+      else return;
+
+      e.preventDefault();
+      tabs[nextIdx].focus();
+      tabs[nextIdx].click(); // asegura selección al navegar
+    }
+
+    function DashboardTabs({ dashboardData, onReset, fileName, derived, syncChartsWithFilters, setSyncChartsWithFilters }) {
       console.debug('[Tabs] received derived', { has: !!derived, rowsArea: Array.isArray(derived?.rowsArea) ? derived.rowsArea.length : 'NA' });
       const [tab, setTab] = useState('analisis');
 
+      // LIFTED STATE from DashboardView
+      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
+      const [studentFilter, setStudentFilter] = useState('');
+      const [areaFilter, setAreaFilter] = useState('');
+      const [asigFilter, setAsigFilter] = useState('');
+      const [estadoFilter, setEstadoFilter] = useState('');
+
+      const dataForAnalysis = useMemo(() => {
+        if (!Array.isArray(dashboardData)) return [];
+        if (courseFilterDV === 'ALL') return dashboardData;
+        return dashboardData.filter(s => (s?.CURSO || '') === courseFilterDV);
+      }, [dashboardData, courseFilterDV]);
+
+      const rowsAreaSource = useMemo(() => {
+        if (derived && Array.isArray(derived.rowsArea)) {
+          return derived.rowsArea;
+        }
+        // Fallback
+        if (!Array.isArray(dataForAnalysis)) return [];
+        const fallbackRows = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
+            fallbackRows.push({
+              id: `${st.id}-${areaName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName,
+              defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
+            });
+          });
+        });
+        return fallbackRows;
+      }, [dataForAnalysis, derived?.rowsArea]);
+
+      const rowsAsigSource = useMemo(() => {
+        if (derived && Array.isArray(derived.rowsAsignatura)) {
+          return derived.rowsAsignatura;
+        }
+        // Fallback
+        if (!Array.isArray(dataForAnalysis)) return [];
+        const fallbackRows = [];
+        dataForAnalysis.forEach(st => {
+          Object.entries(st.areas).forEach(([areaName, areaData]) => {
+            Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
+              fallbackRows.push({
+                id: `${st.id}-${areaName}-${asigName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName, asignatura: asigName,
+                p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
+                promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
+              });
+            });
+          });
+        });
+        return fallbackRows;
+      }, [dataForAnalysis, derived?.rowsAsignatura]);
+
+      const rowsAreaByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAreaSource;
+        return rowsAreaSource.filter(r => (r.CURSO || '') === courseFilterDV);
+      }, [rowsAreaSource, courseFilterDV]);
+
+      const filteredRowsArea = useMemo(() => {
+        if (!rowsAreaByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nEstado = normTxt(estadoFilter);
+        return rowsAreaByCourse.filter(row => {
+            const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+            const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
+            return matchStudent && matchArea && matchEstado;
+        });
+      }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
+
+      const rowsAsigByCourse = useMemo(() => {
+        if (courseFilterDV === 'ALL') return rowsAsigSource;
+        return rowsAsigSource.filter(r => (r.CURSO || '') === courseFilterDV);
+      }, [rowsAsigSource, courseFilterDV]);
+
+      const filteredRowsAsignatura = useMemo(() => {
+        if (!rowsAsigByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nAsig = normTxt(asigFilter);
+        const nEstado = normTxt(estadoFilter);
+        return rowsAsigByCourse.filter(row => {
+          const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+          const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || (row.ASIG_NORM ?? normTxt(row.asignatura)).includes(nAsig) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
+          return matchStudent && matchArea && matchAsig && matchEstado;
+        });
+      }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
+
+      // [ChartsSync] fuentes de datos para gráficos
+      const chartRowsArea = syncChartsWithFilters ? filteredRowsArea : rowsAreaSource;
+      const chartRowsAsig = syncChartsWithFilters ? filteredRowsAsignatura : rowsAsigSource;
+
       return (
         <div className="w-full">
-          <div role="tablist" aria-label="Navegación del dashboard" className="flex gap-2 mb-4">
+          <div role="tablist" aria-label="Secciones del Dashboard" onKeyDown={onTabListKeyDown} className="flex gap-2 mb-4">
             <button
               role="tab"
               id="tab-analisis"
               aria-controls="panel-analisis"
               aria-selected={tab === 'analisis'}
+              tabIndex={tab === 'analisis' ? 0 : -1}
               className={tab === 'analisis'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -333,6 +605,7 @@ if (!window.__DASH_PROF_PATCHED__) {
               id="tab-graficos"
               aria-controls="panel-graficos"
               aria-selected={tab === 'graficos'}
+              tabIndex={tab === 'graficos' ? 0 : -1}
               className={tab === 'graficos'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -346,6 +619,7 @@ if (!window.__DASH_PROF_PATCHED__) {
               id="tab-consultas"
               aria-controls="panel-consultas"
               aria-selected={tab === 'consultas'}
+              tabIndex={tab === 'consultas' ? 0 : -1}
               className={tab === 'consultas'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -358,12 +632,36 @@ if (!window.__DASH_PROF_PATCHED__) {
           <div className="bg-white rounded-lg shadow p-4">
             {tab === 'analisis' && (
               <div role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis">
-                <DashboardView data={dashboardData} onReset={onReset} fileName={fileName} derived={derived} />
+                <DashboardView
+                  data={dataForAnalysis}
+                  onReset={onReset}
+                  fileName={fileName}
+                  derived={derived}
+                  // Pass down lifted state and setters
+                  filters={{ courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter }}
+                  setFilters={{ setCourseFilterDV, setStudentFilter, setAreaFilter, setAsigFilter, setEstadoFilter }}
+                  // Pass down calculated rows
+                  filteredRowsArea={filteredRowsArea}
+                  filteredRowsAsignatura={filteredRowsAsignatura}
+                />
               </div>
             )}
             {tab === 'graficos' && (
               <div role="tabpanel" id="panel-graficos" aria-labelledby="tab-graficos">
-                <DashboardCharts data={dashboardData} />
+                {/* [ChartsSync] toggle en UI de Gráficos */}
+                <div className="flex justify-end mb-4">
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox"
+                          className="rounded"
+                          checked={syncChartsWithFilters}
+                          onChange={e => setSyncChartsWithFilters(e.target.checked)} />
+                    Sincronizar con filtros de Análisis
+                  </label>
+                </div>
+                <DashboardCharts
+                  rowsArea={chartRowsArea}
+                  rowsAsignatura={chartRowsAsig}
+                />
               </div>
             )}
             {tab === 'consultas' && (
@@ -383,16 +681,17 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [courseFilter, setCourseFilter] = useState('ALL');
 
       const courseOptions = useMemo(() => {
-        const set = new Set(
-          Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []
-        );
+        if (!Array.isArray(data)) return ['ALL'];
+        // [Fix-CURSO] conjunto de cursos consistente
+        const getCurso = (r) => r.CURSO ?? r.curso;
+        const set = new Set(data.map(getCurso).filter(Boolean));
         return ['ALL', ...Array.from(set)];
       }, [data]);
 
       const filteredData = useMemo(() => {
         if (!Array.isArray(data)) return [];
         if (courseFilter === 'ALL') return data;
-        return data.filter(s => s.__course === courseFilter);
+        return data.filter(s => (s.CURSO ?? s.curso) === courseFilter);
       }, [data, courseFilter]);
 
       const areaLabels = useMemo(() => Array.from(new Set(filteredData.flatMap(s => Object.keys(s.areas)))), [filteredData]);
@@ -538,7 +837,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     // ...resto del código React...
   </script>
   <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, "Noto Sans", 'Apple Color Emoji', 'Segoe UI Emoji'; }
@@ -581,7 +880,9 @@ if (!window.__DASH_PROF_PATCHED__) {
     const textNormalize = (v) => (typeof v === 'string' ? v.trim() : v);
     const toUpperSafe = (v) => (v == null ? '' : String(v).trim().toUpperCase());
 
-    const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    function normTxt(s){ return (s==null?'':String(s)).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); }
 
     const normalizeName = (s) => {
       let v = toUpperSafe(s);
@@ -875,7 +1176,9 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [pendingFile, setPendingFile] = useState(null);
       const [isDragging, setIsDragging] = useState(false);
       const inputRef = useRef(null);
-      const [overlay, setOverlay] = useState({ visible: false, text: 'Procesando…' });
+      const [overlayVisible, setOverlayVisible] = useState(false);
+      // [OverlayPhase] estado de fase de procesamiento
+      const [processingPhase, setProcessingPhase] = useState('');
 
       const handleSelected = (flist) => {
         if (!flist || flist.length === 0) return;
@@ -887,7 +1190,8 @@ if (!window.__DASH_PROF_PATCHED__) {
       const handleProcessClick = async () => {
         if (!pendingFile) return;
 
-        setOverlay({ visible: true, text: 'Procesando…' });
+        setProcessingPhase('');
+        setOverlayVisible(true);
         await new Promise(resolve => requestAnimationFrame(resolve));
 
         const f = pendingFile;
@@ -895,39 +1199,40 @@ if (!window.__DASH_PROF_PATCHED__) {
 
         reader.onload = (e) => {
           try {
-            setOverlay({ visible: true, text: 'Importando libro de Excel…' });
+            // [OverlayPhase] secuencia de fases
+            setProcessingPhase('Importando…');
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
             if (!wb.SheetNames || wb.SheetNames.length === 0) {
-              setOverlay({ visible: true, text: 'Error: El archivo no contiene hojas.' });
-              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setProcessingPhase('Error: El archivo no contiene hojas.');
+              setTimeout(() => setOverlayVisible(false), 2000);
               setPendingFile(null);
               return;
             }
             
-            setOverlay({ visible: true, text: 'Analizando hojas…' });
+            setProcessingPhase('Analizando…');
             const profiles = importWorkbookToProfiles(wb, f.name);
 
             if (profiles.length === 0) {
-              setOverlay({ visible: true, text: 'Error: Estructura inválida.' });
-              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setProcessingPhase('Error: Estructura inválida.');
+              setTimeout(() => setOverlayVisible(false), 2000);
               setPendingFile(null);
               return;
             }
             
-            setOverlay({ visible: true, text: 'Consolidando datos…' });
+            setProcessingPhase('Consolidando…');
             onWorkbookProcessed(profiles);
           } catch (err) {
             console.error("Error processing file:", err);
-            setOverlay({ visible: true, text: 'Error al procesar. Revise el archivo.' });
-            setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+            setProcessingPhase('Error al procesar. Revise el archivo.');
+            setTimeout(() => setOverlayVisible(false), 2000);
             setPendingFile(null);
           }
         };
 
         reader.onerror = () => {
-          setOverlay({ visible: true, text: 'Error al leer el archivo.' });
-          setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+          setProcessingPhase('Error al leer el archivo.');
+          setTimeout(() => setOverlayVisible(false), 2000);
           setPendingFile(null);
         };
 
@@ -992,11 +1297,14 @@ if (!window.__DASH_PROF_PATCHED__) {
               )}
             </div>
           </div>
-          {overlay.visible && (
+          {overlayVisible && (
             <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" role="status" aria-live="assertive">
               <div className="flex flex-col items-center">
                 <div className="animate-spin h-10 w-10 rounded-full border-4 border-blue-300 border-t-blue-600"></div>
-                <p className="mt-3 font-semibold text-blue-800">{overlay.text}</p>
+                {/* [OverlayPhase] texto dinámico */}
+                <div aria-live="polite" className="mt-3 font-semibold text-blue-800">
+                  {processingPhase || 'Preparando…'}
+                </div>
               </div>
             </div>
           )}
@@ -1106,13 +1414,10 @@ if (!window.__DASH_PROF_PATCHED__) {
       );
     };
 
-    const DashboardView = ({ data, onReset, fileName, derived }) => {
+    const DashboardView = ({ data, onReset, fileName, derived, filters, setFilters }) => {
       console.time('render:DashboardView');
-      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
-      const [studentFilter, setStudentFilter] = useState('');
-      const [areaFilter, setAreaFilter] = useState('');
-      const [asigFilter, setAsigFilter] = useState('');
-      const [estadoFilter, setEstadoFilter] = useState('');
+      const { courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter } = filters;
+      const { setCourseFilterDV, setStudentFilter, setAreaFilter, setAsigFilter, setEstadoFilter } = setFilters;
       const [subtab, setSubtab] = useState('areas');
       const [pageAreas, setPageAreas] = useState(1);
       const [pageAsig, setPageAsig] = useState(1);
@@ -1124,17 +1429,17 @@ if (!window.__DASH_PROF_PATCHED__) {
       console.debug('[DashboardView] KPIs: using derived?', hasDerivedKPIs);
       const hasActiveFilters = !!(courseFilterDV !== 'ALL' || studentFilter || areaFilter || asigFilter || estadoFilter);
 
-      const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.__course), [data]);
+      const showCourseCol = useMemo(() => Array.isArray(data) && data.some(s => !!s?.CURSO), [data]);
 
       const courseOptionsDV = useMemo(() => {
-        const set = new Set(Array.isArray(data) ? data.map(s => s?.__course).filter(Boolean) : []);
+        const set = new Set(Array.isArray(data) ? data.map(s => s?.CURSO).filter(Boolean) : []);
         return ['ALL', ...Array.from(set)];
       }, [data]);
 
       const dataForAnalysis = useMemo(() => {
         if (!Array.isArray(data)) return [];
         if (courseFilterDV === 'ALL') return data;
-        return data.filter(s => (s?.__course || '') === courseFilterDV);
+        return data.filter(s => (s?.CURSO || '') === courseFilterDV);
       }, [data, courseFilterDV]);
 
       useEffect(() => {
@@ -1169,7 +1474,7 @@ if (!window.__DASH_PROF_PATCHED__) {
         data.forEach(st => {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
             fallbackRows.push({
-              id: `${st.id}-${areaName}`, __course: st.__course, estudiante: st.name, area: areaName,
+              id: `${st.id}-${areaName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName,
               defP1: areaData.DEF?.P1, defP2: areaData.DEF?.P2, defP3: areaData.DEF?.P3,
               promActual: areaData.areaStats?.promedioActual, p4Min: areaData.areaStats?.p4Min, estado: areaData.areaStats?.estado
             });
@@ -1180,15 +1485,18 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const rowsAreaByCourse = useMemo(() => {
         if (courseFilterDV === 'ALL') return rowsAreaSource;
-        return rowsAreaSource.filter(r => (r.__course || '') === courseFilterDV);
+        return rowsAreaSource.filter(r => (r.CURSO || '') === courseFilterDV);
       }, [rowsAreaSource, courseFilterDV]);
 
       const filteredRowsArea = useMemo(() => {
         if (!rowsAreaByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAreaByCourse.filter(row => {
-            const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-            const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-            const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+            const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+            const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
             return matchStudent && matchArea && matchEstado;
         });
       }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
@@ -1204,7 +1512,7 @@ if (!window.__DASH_PROF_PATCHED__) {
           Object.entries(st.areas).forEach(([areaName, areaData]) => {
             Object.entries(areaData.asignaturas).forEach(([asigName, asigData]) => {
               fallbackRows.push({
-                id: `${st.id}-${areaName}-${asigName}`, __course: st.__course, estudiante: st.name, area: areaName, asignatura: asigName,
+                id: `${st.id}-${areaName}-${asigName}`, CURSO: st.CURSO, estudiante: st.name, area: areaName, asignatura: asigName,
                 p1: asigData.P1, p2: asigData.P2, p3: asigData.P3,
                 promActual: asigData.promedioActual, p4Min: asigData.p4Min, estado: asigData.estado
               });
@@ -1216,16 +1524,20 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const rowsAsigByCourse = useMemo(() => {
         if (courseFilterDV === 'ALL') return rowsAsigSource;
-        return rowsAsigSource.filter(r => (r.__course || '') === courseFilterDV);
+        return rowsAsigSource.filter(r => (r.CURSO || '') === courseFilterDV);
       }, [rowsAsigSource, courseFilterDV]);
 
       const filteredRowsAsignatura = useMemo(() => {
         if (!rowsAsigByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nAsig = normTxt(asigFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAsigByCourse.filter(row => {
-          const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-          const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-          const matchAsig = !asigFilter || row.asignatura.toLowerCase().includes(asigFilter.toLowerCase()) || row.asignatura === asigFilter;
-          const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+          const matchStudent = !studentFilter || (row.EST_NORM ?? normTxt(row.estudiante)).includes(nStudent);
+          const matchArea = !areaFilter || (row.AREA_NORM ?? normTxt(row.area)).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || (row.ASIG_NORM ?? normTxt(row.asignatura)).includes(nAsig) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
           return matchStudent && matchArea && matchAsig && matchEstado;
         });
       }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
@@ -1452,8 +1764,8 @@ if (!window.__DASH_PROF_PATCHED__) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsAsignatura.map(row => (
-                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                           <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
@@ -1498,8 +1810,8 @@ if (!window.__DASH_PROF_PATCHED__) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsArea.map(row => (
-                        <tr key={`${row.__course || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.__course || ''}</td>}
+                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                           <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
@@ -1657,6 +1969,15 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [qualityLog, setQualityLog] = useState([]);
       const [derived, setDerived] = useState(null);
       const addInputRef = useRef(null);
+
+      // [ChartsSync] estado persistente
+      const [syncChartsWithFilters, setSyncChartsWithFilters] = React.useState(() => {
+        const v = localStorage.getItem('syncChartsWithFilters');
+        return v === 'true' ? true : false; // default OFF
+      });
+      React.useEffect(() => {
+        localStorage.setItem('syncChartsWithFilters', String(syncChartsWithFilters));
+      }, [syncChartsWithFilters]);
       const courseNameFrom = (name) => String(name || '').replace(/\.(xlsx|xls|csv)$/i, '');
 
       // --- Loading global (accesible y con mensajes) ---
@@ -1669,41 +1990,76 @@ if (!window.__DASH_PROF_PATCHED__) {
       // Pequeño "yield" para permitir pintar la UI entre pasos pesados
       const uiTick = () => new Promise(r => setTimeout(r, 0));
 
+      // [Fix-CURSO] helper central: garantiza r.CURSO consistente
+      function withCurso(rows) {
+        const norm = (v) => (v == null ? '' : String(v).trim());
+        return (rows || []).map((r) => {
+          const c =
+            (r.CURSO ??
+            r.curso ??
+            r.Curso ??
+            r.course ??
+            r.COD_CURSO ??
+            r.cod_curso ??
+            (r.meta && (r.meta.CURSO || r.meta.curso))) ||
+            '';
+          const v = norm(c);
+          return v ? (r.CURSO ? r : { ...r, CURSO: v }) : { ...r, CURSO: 'SIN_CURSO' };
+        });
+      }
+
       const buildDerived = (dataset) => {
         if (!Array.isArray(dataset) || dataset.length === 0) {
           return { rowsArea: [], rowsAsignatura: [], studentList: [], areaList: [], asigList: [], courseList: [], promGeneral: 0, estadoCounts: {}, areaRiesgo: [] };
         }
 
         const rowsArea = dataset.flatMap(st =>
-          Object.entries(st.areas).map(([areaName, areaData]) => ({
-            id: `${st.id}-${areaName}`,
-            __course: st.__course,
-            estudiante: st.name,
-            area: areaName,
-            defP1: areaData.DEF?.P1,
-            defP2: areaData.DEF?.P2,
-            defP3: areaData.DEF?.P3,
-            promActual: areaData.areaStats?.promedioActual,
-            p4Min: areaData.areaStats?.p4Min,
-            estado: areaData.areaStats?.estado,
-          }))
+          Object.entries(st.areas).map(([areaName, areaData]) => {
+            // [Fix-CURSO] normalización defensiva del curso
+            const _curso = st.CURSO ?? st.curso ?? st.Curso ?? st.__course ?? 'SIN_CURSO';
+            return {
+              id: `${st.id}-${areaName}`,
+              CURSO: _curso,
+              estudiante: st.name,
+              area: areaName,
+              defP1: areaData.DEF?.P1,
+              defP2: areaData.DEF?.P2,
+              defP3: areaData.DEF?.P3,
+              promActual: areaData.areaStats?.promedioActual,
+              p4Min: areaData.areaStats?.p4Min,
+              estado: areaData.areaStats?.estado,
+              // [PreNorm] campos normalizados para búsquedas/filtrado
+              CURSO_NORM: normTxt(_curso),
+              AREA_NORM:  normTxt(areaName),
+              EST_NORM:   normTxt(st.name),
+            };
+          })
         );
 
         const rowsAsignatura = dataset.flatMap(st =>
           Object.entries(st.areas).flatMap(([areaName, areaData]) =>
-            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => ({
-              id: `${st.id}-${areaName}-${asigName}`,
-              __course: st.__course,
-              estudiante: st.name,
-              area: areaName,
-              asignatura: asigName,
-              p1: asigData.P1,
-              p2: asigData.P2,
-              p3: asigData.P3,
-              promActual: asigData.promedioActual,
-              p4Min: asigData.p4Min,
-              estado: asigData.estado,
-            }))
+            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => {
+              // [Fix-CURSO] normalización defensiva del curso
+              const _curso = st.CURSO ?? st.curso ?? st.Curso ?? st.__course ?? 'SIN_CURSO';
+              return {
+                id: `${st.id}-${areaName}-${asigName}`,
+                CURSO: _curso,
+                estudiante: st.name,
+                area: areaName,
+                asignatura: asigName,
+                p1: asigData.P1,
+                p2: asigData.P2,
+                p3: asigData.P3,
+                promActual: asigData.promedioActual,
+                p4Min: asigData.p4Min,
+                estado: asigData.estado,
+                // [PreNorm] campos normalizados para búsquedas/filtrado
+                CURSO_NORM: normTxt(_curso),
+                AREA_NORM:  normTxt(areaName),
+                ASIG_NORM:  normTxt(asigName),
+                EST_NORM:   normTxt(st.name),
+              };
+            })
           )
         );
 
@@ -1939,16 +2295,23 @@ if (!window.__DASH_PROF_PATCHED__) {
         const nextSelected = mergedCourses.length > 1 ? 'ALL' : mergedCourses[0].name;
         setSelectedCourse(nextSelected);
 
-        const nextData = nextSelected === 'ALL'
-          ? mergedCourses.flatMap(c => c.data)
-          : mergedCourses[0].data;
+        const nextData = mergedCourses.flatMap(c => c.data.map(s => ({ ...s, CURSO: c.name })));
 
         setAnalysisData(nextData);
 
         const d = buildDerived(nextData);
-        setDerived(d);
-        console.debug('[App] derived built (areas)', { rowsArea: d?.rowsArea?.length });
-        console.debug('[App] derived built (asignaturas)', { rowsAsignatura: d?.rowsAsignatura?.length });
+        
+        const rowsAreaNorm = withCurso(d.rowsArea);
+        const rowsAsignNorm = withCurso(d.rowsAsignatura);
+
+        const derivedNorm = {
+          ...d,
+          rowsArea: rowsAreaNorm,
+          rowsAsignatura: rowsAsignNorm,
+        };
+        setDerived(derivedNorm);
+        console.debug('[App] derived built (areas)', { rowsArea: derivedNorm?.rowsArea?.length });
+        console.debug('[App] derived built (asignaturas)', { rowsAsignatura: derivedNorm?.rowsAsignatura?.length });
         console.debug('[App] derived built (indices)', { students: d.studentList.length, areas: d.areaList.length, asigs: d.asigList.length, courses: d.courseList.length });
         console.debug('[App] derived built (kpis)', { promGeneral: d.promGeneral, estadoCounts: d.estadoCounts, areaRiesgo: d.areaRiesgo.length });
 
@@ -2032,7 +2395,7 @@ if (!window.__DASH_PROF_PATCHED__) {
           return courses.find(c => c.name === selectedCourse)?.data ?? analysisData;
         }
         if (courses.length > 0) {
-          return courses.flatMap(c => c.data.map(s => ({ ...s, __course: c.name })));
+          return courses.flatMap(c => c.data.map(s => ({ ...s, CURSO: c.name })));
         }
         return analysisData;
       }, [courses, selectedCourse, analysisData]);
@@ -2144,7 +2507,7 @@ if (!window.__DASH_PROF_PATCHED__) {
                 }}
               />
             </div>
-            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} />
+            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} syncChartsWithFilters={syncChartsWithFilters} setSyncChartsWithFilters={setSyncChartsWithFilters} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
               <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>              <hr className="my-6"/>
               <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
