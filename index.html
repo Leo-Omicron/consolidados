@@ -1166,6 +1166,11 @@ function notaFromCell(v) {
     // ======================================
     // (6) Componentes de Interfaz
     // ======================================
+// [NotesZero][Paso 3] Render estable para notas
+function formatNota(n){
+  return Number.isFinite(n) ? n.toFixed(2) : '-';
+}
+
     const StatusBadge = ({ status }) => {
       const color = {
         red: 'bg-red-200 text-red-900 border border-red-400',
@@ -1788,11 +1793,11 @@ function notaFromCell(v) {
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
                           <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.p1 === 'number' ? row.p1.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.p2 === 'number' ? row.p2.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.p3 === 'number' ? row.p3.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p1)}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p2)}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p3)}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
                           <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
                         </tr>
                       ))}
@@ -1833,11 +1838,11 @@ function notaFromCell(v) {
                           {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
                           <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
                           <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP1 === 'number' ? row.defP1.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP2 === 'number' ? row.defP2.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right">{typeof row.defP3 === 'number' ? row.defP3.toFixed(2) : '-'}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.promActual === 'number' ? row.promActual.toFixed(2) : 'N/A'}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{typeof row.p4Min === 'number' ? row.p4Min.toFixed(2) : 'N/A'}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP1)}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP2)}</td>
+                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP3)}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
                           <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
                         </tr>
                       ))}
