@@ -548,10 +548,13 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const filteredRowsArea = useMemo(() => {
         if (!rowsAreaByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAreaByCourse.filter(row => {
-            const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-            const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-            const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+            const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
+            const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
             return matchStudent && matchArea && matchEstado;
         });
       }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
@@ -563,11 +566,15 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const filteredRowsAsignatura = useMemo(() => {
         if (!rowsAsigByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nAsig = normTxt(asigFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAsigByCourse.filter(row => {
-          const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-          const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-          const matchAsig = !asigFilter || row.asignatura.toLowerCase().includes(asigFilter.toLowerCase()) || row.asignatura === asigFilter;
-          const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+          const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
+          const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || normTxt(row.asignatura).includes(nAsig) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
           return matchStudent && matchArea && matchAsig && matchEstado;
         });
       }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
@@ -874,6 +881,8 @@ if (!window.__DASH_PROF_PATCHED__) {
     const toUpperSafe = (v) => (v == null ? '' : String(v).trim().toUpperCase());
 
     const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    function normTxt(s){ return (s==null?'':String(s)).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); }
 
     const normalizeName = (s) => {
       let v = toUpperSafe(s);
@@ -1481,10 +1490,13 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const filteredRowsArea = useMemo(() => {
         if (!rowsAreaByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAreaByCourse.filter(row => {
-            const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-            const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-            const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+            const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
+            const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+            const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
             return matchStudent && matchArea && matchEstado;
         });
       }, [rowsAreaByCourse, studentFilter, areaFilter, estadoFilter]);
@@ -1517,11 +1529,15 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       const filteredRowsAsignatura = useMemo(() => {
         if (!rowsAsigByCourse) return [];
+        const nStudent = normTxt(studentFilter);
+        const nArea = normTxt(areaFilter);
+        const nAsig = normTxt(asigFilter);
+        const nEstado = normTxt(estadoFilter);
         return rowsAsigByCourse.filter(row => {
-          const matchStudent = !studentFilter || row.estudiante.toLowerCase().includes(studentFilter.toLowerCase());
-          const matchArea = !areaFilter || row.area.toLowerCase().includes(areaFilter.toLowerCase()) || row.area === areaFilter;
-          const matchAsig = !asigFilter || row.asignatura.toLowerCase().includes(asigFilter.toLowerCase()) || row.asignatura === asigFilter;
-          const matchEstado = !estadoFilter || (row.estado?.text && (row.estado.text.toLowerCase().includes(estadoFilter.toLowerCase()) || row.estado.text === estadoFilter));
+          const matchStudent = !studentFilter || normTxt(row.estudiante).includes(nStudent);
+          const matchArea = !areaFilter || normTxt(row.area).includes(nArea) || row.area === areaFilter;
+          const matchAsig = !asigFilter || normTxt(row.asignatura).includes(nAsig) || row.asignatura === asigFilter;
+          const matchEstado = !estadoFilter || (row.estado?.text && normTxt(row.estado.text).includes(nEstado));
           return matchStudent && matchArea && matchAsig && matchEstado;
         });
       }, [rowsAsigByCourse, studentFilter, areaFilter, asigFilter, estadoFilter]);
