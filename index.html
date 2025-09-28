@@ -1322,13 +1322,10 @@ if (!window.__DASH_PROF_PATCHED__) {
       );
     };
 
-    const DashboardView = ({ data, onReset, fileName, derived }) => {
+    const DashboardView = ({ data, onReset, fileName, derived, filters, setFilters }) => {
       console.time('render:DashboardView');
-      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
-      const [studentFilter, setStudentFilter] = useState('');
-      const [areaFilter, setAreaFilter] = useState('');
-      const [asigFilter, setAsigFilter] = useState('');
-      const [estadoFilter, setEstadoFilter] = useState('');
+      const { courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter } = filters;
+      const { setCourseFilterDV, setStudentFilter, setAreaFilter, setAsigFilter, setEstadoFilter } = setFilters;
       const [subtab, setSubtab] = useState('areas');
       const [pageAreas, setPageAreas] = useState(1);
       const [pageAsig, setPageAsig] = useState(1);
@@ -1873,6 +1870,15 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [qualityLog, setQualityLog] = useState([]);
       const [derived, setDerived] = useState(null);
       const addInputRef = useRef(null);
+
+      // [ChartsSync] estado persistente
+      const [syncChartsWithFilters, setSyncChartsWithFilters] = React.useState(() => {
+        const v = localStorage.getItem('syncChartsWithFilters');
+        return v === 'true' ? true : false; // default OFF
+      });
+      React.useEffect(() => {
+        localStorage.setItem('syncChartsWithFilters', String(syncChartsWithFilters));
+      }, [syncChartsWithFilters]);
       const courseNameFrom = (name) => String(name || '').replace(/\.(xlsx|xls|csv)$/i, '');
 
       // --- Loading global (accesible y con mensajes) ---
@@ -2393,7 +2399,7 @@ if (!window.__DASH_PROF_PATCHED__) {
                 }}
               />
             </div>
-            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} />
+            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} syncChartsWithFilters={syncChartsWithFilters} setSyncChartsWithFilters={setSyncChartsWithFilters} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
               <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>              <hr className="my-6"/>
               <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
