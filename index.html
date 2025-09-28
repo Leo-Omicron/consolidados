@@ -85,19 +85,16 @@
     var params = new URLSearchParams(location.search);
     var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
 
-    // Inyección SINCRÓNICA (durante el parseo) para bloquear hasta que React esté disponible
-    var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '"><' + '/script>';
-    var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_PROD) + '"><' + '/script>';
-    // ⚠️ Nota: r2 usa REACTDOM_PROD/DEV correctamente:
-    r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '"><' + '/script>';
-
+    // Inyección SINCRÓNICA con crossorigin (preparación SRI, sin cambiar URLs)
+    var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '" crossorigin="anonymous"><' + '/script>';
+    var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '" crossorigin="anonymous"><' + '/script>';
     document.write(r1);
     document.write(r2);
   })();
 </script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
   <!-- Chart.js para gráficos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
   <script>
     // Flag persistente para silenciar errores externos en DEV
     (function () {
@@ -196,6 +193,61 @@
       };
     })();
   </script>
+<script>
+/** ResourceGuard – Diagnóstico de CDNs y aviso de fallos (no intrusivo)
+ *  - Loggea errores de recursos (CORS/SRI/bloqueos).
+ *  - Verifica que Tailwind esté aplicando estilos.
+ *  - Muestra un banner discreto si algo falla.
+ */
+(function () {
+  // Escucha errores de recursos (scripts/links)
+  window.addEventListener('error', function (e) {
+    var t = e.target || {};
+    var isRes = t.tagName === 'SCRIPT' || t.tagName === 'LINK';
+    if (!isRes) return;
+    var url = t.src || t.href || '(desconocido)';
+    console.warn('[ResourceGuard] Error cargando recurso:', t.tagName, url);
+    showBanner('No se pudo cargar un recurso: ' + url + '. Revisa conexión, CORS o SRI.');
+  }, true);
+
+  // Tras DOM listo, valida que Tailwind aplique clases utilitarias básicas
+  document.addEventListener('DOMContentLoaded', function () {
+    // Se usa un breve retraso para dar tiempo al script de Tailwind a escanear el DOM y aplicar estilos.
+    setTimeout(function() {
+      try {
+        var probe = document.createElement('div');
+        probe.className = 'hidden p-4';
+        document.body.appendChild(probe);
+        var cs = window.getComputedStyle(probe);
+        var okHidden = cs.display === 'none';
+        document.body.removeChild(probe);
+        if (!okHidden) {
+          console.warn('[ResourceGuard] Tailwind parece no estar activo (clase .hidden no aplicada).');
+          showBanner('Tailwind no se aplicó correctamente. Verifica la carga desde cdn.tailwindcss.com.');
+        }
+      } catch (err) {
+        console.warn('[ResourceGuard] Error verificando Tailwind:', err);
+      }
+    }, 500);
+  });
+
+  // Banner minimalista y removible
+  function showBanner(msg) {
+    if (document.getElementById('res-guard-banner')) return;
+    var b = document.createElement('div');
+    b.id = 'res-guard-banner';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;padding:10px;border-radius:8px;background:#111827;color:#F9FAFB;font:14px/1.4 system-ui,Segoe UI,Roboto;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    b.textContent = '⚠️ ' + msg + ' ';
+    var close = document.createElement('button');
+    close.textContent = 'Cerrar';
+    close.style.cssText = 'margin-left:8px;padding:4px 8px;border-radius:6px;border:1px solid #374151;background:#1F2937;color:#F3F4F6;cursor:pointer';
+    close.onclick = function () { b.remove(); };
+    b.appendChild(close);
+    document.body.appendChild(b);
+  }
+})();
+</script>
   <script type="text/babel">
 /** =========================================
  * Hito 1 (B): Flag DEV + DBG + profiling seguro
@@ -411,6 +463,27 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
     // =============================
+        // [A11yTabs] manejo de teclas ← → Home End
+    function onTabListKeyDown(e) {
+      const LEFT = 'ArrowLeft', RIGHT = 'ArrowRight', HOME = 'Home', END = 'End';
+      const list = e.currentTarget;
+      const tabs = Array.from(list.querySelectorAll('[role="tab"]')).filter(el => !el.hasAttribute('disabled'));
+      const current = document.activeElement;
+      const idx = tabs.indexOf(current);
+      if (idx === -1) return;
+
+      let nextIdx = idx;
+      if (e.key === LEFT) nextIdx = (idx - 1 + tabs.length) % tabs.length;
+      else if (e.key === RIGHT) nextIdx = (idx + 1) % tabs.length;
+      else if (e.key === HOME) nextIdx = 0;
+      else if (e.key === END) nextIdx = tabs.length - 1;
+      else return;
+
+      e.preventDefault();
+      tabs[nextIdx].focus();
+      tabs[nextIdx].click(); // asegura selección al navegar
+    }
+
     function DashboardTabs({ dashboardData, onReset, fileName, derived, syncChartsWithFilters, setSyncChartsWithFilters }) {
       console.debug('[Tabs] received derived', { has: !!derived, rowsArea: Array.isArray(derived?.rowsArea) ? derived.rowsArea.length : 'NA' });
       const [tab, setTab] = useState('analisis');
@@ -505,12 +578,13 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       return (
         <div className="w-full">
-          <div role="tablist" aria-label="Navegación del dashboard" className="flex gap-2 mb-4">
+          <div role="tablist" aria-label="Secciones del Dashboard" onKeyDown={onTabListKeyDown} className="flex gap-2 mb-4">
             <button
               role="tab"
               id="tab-analisis"
               aria-controls="panel-analisis"
               aria-selected={tab === 'analisis'}
+              tabIndex={tab === 'analisis' ? 0 : -1}
               className={tab === 'analisis'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -524,6 +598,7 @@ if (!window.__DASH_PROF_PATCHED__) {
               id="tab-graficos"
               aria-controls="panel-graficos"
               aria-selected={tab === 'graficos'}
+              tabIndex={tab === 'graficos' ? 0 : -1}
               className={tab === 'graficos'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -537,6 +612,7 @@ if (!window.__DASH_PROF_PATCHED__) {
               id="tab-consultas"
               aria-controls="panel-consultas"
               aria-selected={tab === 'consultas'}
+              tabIndex={tab === 'consultas' ? 0 : -1}
               className={tab === 'consultas'
                 ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
                 : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
@@ -754,7 +830,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     // ...resto del código React...
   </script>
   <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, "Noto Sans", 'Apple Color Emoji', 'Segoe UI Emoji'; }
