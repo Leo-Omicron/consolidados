@@ -874,9 +874,28 @@ if (!window.__DASH_PROF_PATCHED__) {
     const DatabaseIcon = (p) => <Icon {...p} path={<Fragment><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></Fragment>} />
     const BarChartIcon = (p) => <Icon {...p} path={<Fragment><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></Fragment>} />
 
-    // ==============================================
+    // =============================================
     // Utilidades: normalización y helpers del parser
     // ==============================================
+// [NotesZero][Paso 1] Normaliza nota desde celda XLSX:
+// - vacío/null/undefined  -> 0.0
+// - string numérico       -> número [0..5]
+// - no numérico real      -> null (se seguirá mostrando "-")
+function notaFromCell(v) {
+  if (v === null || v === undefined) return 0.0;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (t === '') return 0.0;
+    const n = parseFloat(t.replace(',', '.'));
+    if (!Number.isFinite(n)) return null;
+    v = n;
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const n = Math.max(0, Math.min(5, v));
+    return Number(n.toFixed(2));
+  }
+  return null;
+}
     const textNormalize = (v) => (typeof v === 'string' ? v.trim() : v);
     const toUpperSafe = (v) => (v == null ? '' : String(v).trim().toUpperCase());
 
@@ -1022,7 +1041,7 @@ if (!window.__DASH_PROF_PATCHED__) {
             if (!area || area === 'META' || !asignatura || !componente) return;
             if (!student.areas[area]) student.areas[area] = { asignaturas: {}, DEF: {} };
 
-            let note = cleaningLogic.convertToNumber(row[index]);
+            let note = notaFromCell(row[index]);
             // Si hay texto no numérico visible
             if (row[index] !== null && String(row[index]).trim() !== '' && note === null) {
               log.push({ type: 'warning', message: `'${studentName}': Valor no numérico '${row[index]}' en ${area}>${asignatura}>${componente} → nulo.` });
@@ -1074,13 +1093,13 @@ if (!window.__DASH_PROF_PATCHED__) {
         return { text: 'Ganado', color: 'green' };
       },
       calcPromYMin: (p1, p2, p3) => {
-        const vals = [p1, p2, p3].filter(v => v !== null && v !== undefined);
-        if (vals.length === 0) return { promedioActual: null, p4Min: null, estado: { text: 'N/A', color: 'gray' } };
-        const sum = vals.reduce((a,b)=>a+b, 0);
-        const promedioActual = sum / vals.length; // promedio de los presentes (mejor lectura)
-        let p4Min = 12 - (p1 ?? 0) - (p2 ?? 0) - (p3 ?? 0); // mantengo criterio institucional (sumatoria ≥ 12)
-        if (p4Min < 0) p4Min = 0;
-        if (!Number.isFinite(p4Min)) p4Min = null;
+        // [NotesZero][Paso 2] Promedio incluye 0.0 y divide por 3 fijo
+        const n1 = Number.isFinite(p1) ? p1 : 0;
+        const n2 = Number.isFinite(p2) ? p2 : 0;
+        const n3 = Number.isFinite(p3) ? p3 : 0;
+        const suma = n1 + n2 + n3;
+        const promedioActual = Number(((suma) / 3).toFixed(2));
+        const p4Min = Number(Math.max(0, 12 - suma).toFixed(2)); // regla vigente
         return { promedioActual, p4Min, estado: calculationLogic.getStatus(p4Min) };
       },
       performAllCalculations: (structuredData) => structuredData.map(student => {
