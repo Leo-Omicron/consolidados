@@ -1167,7 +1167,9 @@ if (!window.__DASH_PROF_PATCHED__) {
       const [pendingFile, setPendingFile] = useState(null);
       const [isDragging, setIsDragging] = useState(false);
       const inputRef = useRef(null);
-      const [overlay, setOverlay] = useState({ visible: false, text: 'Procesando…' });
+      const [overlayVisible, setOverlayVisible] = useState(false);
+      // [OverlayPhase] estado de fase de procesamiento
+      const [processingPhase, setProcessingPhase] = useState('');
 
       const handleSelected = (flist) => {
         if (!flist || flist.length === 0) return;
@@ -1179,7 +1181,8 @@ if (!window.__DASH_PROF_PATCHED__) {
       const handleProcessClick = async () => {
         if (!pendingFile) return;
 
-        setOverlay({ visible: true, text: 'Procesando…' });
+        setProcessingPhase('');
+        setOverlayVisible(true);
         await new Promise(resolve => requestAnimationFrame(resolve));
 
         const f = pendingFile;
@@ -1187,39 +1190,40 @@ if (!window.__DASH_PROF_PATCHED__) {
 
         reader.onload = (e) => {
           try {
-            setOverlay({ visible: true, text: 'Importando libro de Excel…' });
+            // [OverlayPhase] secuencia de fases
+            setProcessingPhase('Importando…');
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
             if (!wb.SheetNames || wb.SheetNames.length === 0) {
-              setOverlay({ visible: true, text: 'Error: El archivo no contiene hojas.' });
-              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setProcessingPhase('Error: El archivo no contiene hojas.');
+              setTimeout(() => setOverlayVisible(false), 2000);
               setPendingFile(null);
               return;
             }
             
-            setOverlay({ visible: true, text: 'Analizando hojas…' });
+            setProcessingPhase('Analizando…');
             const profiles = importWorkbookToProfiles(wb, f.name);
 
             if (profiles.length === 0) {
-              setOverlay({ visible: true, text: 'Error: Estructura inválida.' });
-              setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+              setProcessingPhase('Error: Estructura inválida.');
+              setTimeout(() => setOverlayVisible(false), 2000);
               setPendingFile(null);
               return;
             }
             
-            setOverlay({ visible: true, text: 'Consolidando datos…' });
+            setProcessingPhase('Consolidando…');
             onWorkbookProcessed(profiles);
           } catch (err) {
             console.error("Error processing file:", err);
-            setOverlay({ visible: true, text: 'Error al procesar. Revise el archivo.' });
-            setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+            setProcessingPhase('Error al procesar. Revise el archivo.');
+            setTimeout(() => setOverlayVisible(false), 2000);
             setPendingFile(null);
           }
         };
 
         reader.onerror = () => {
-          setOverlay({ visible: true, text: 'Error al leer el archivo.' });
-          setTimeout(() => setOverlay({ visible: false, text: 'Procesando…' }), 2000);
+          setProcessingPhase('Error al leer el archivo.');
+          setTimeout(() => setOverlayVisible(false), 2000);
           setPendingFile(null);
         };
 
@@ -1284,11 +1288,14 @@ if (!window.__DASH_PROF_PATCHED__) {
               )}
             </div>
           </div>
-          {overlay.visible && (
+          {overlayVisible && (
             <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" role="status" aria-live="assertive">
               <div className="flex flex-col items-center">
                 <div className="animate-spin h-10 w-10 rounded-full border-4 border-blue-300 border-t-blue-600"></div>
-                <p className="mt-3 font-semibold text-blue-800">{overlay.text}</p>
+                {/* [OverlayPhase] texto dinámico */}
+                <div aria-live="polite" className="mt-3 font-semibold text-blue-800">
+                  {processingPhase || 'Preparando…'}
+                </div>
               </div>
             </div>
           )}
