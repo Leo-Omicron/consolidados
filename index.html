@@ -257,6 +257,35 @@
  * ========================================= */
 window.__DASH_DEV__ = window.__DASH_DEV__ ?? false;
 
+// [ErrorBoundary] Captura errores de render y muestra UI de recuperación
+class AppErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state = { hasError: false, info: null }; }
+  static getDerivedStateFromError(err){ return { hasError: true }; }
+  componentDidCatch(error, info){ this.setState({ info }); if (window.__DASH_DEV__) console.error('[ErrorBoundary]', error, info); }
+  handleRetry = () => {
+    try { localStorage.setItem('lastErrorBoundaryAt', String(Date.now())); } catch (_) {}
+    // Reintento suave: forzar un rerender del árbol sin recargar toda la página
+    this.setState({ hasError: false, info: null });
+    // Opcional: si persiste, ofrecer reload completo:
+    // location.reload();
+  };
+  render(){
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 m-4 rounded-xl border border-gray-300 bg-white text-gray-800">
+          <h2 className="text-base font-semibold mb-2">Ocurrió un error inesperado</h2>
+          <p className="text-sm mb-4">Puedes intentar continuar sin recargar. Si el problema persiste, refresca la página.</p>
+          <button className="px-3 py-1.5 rounded-lg border border-gray-400" onClick={this.handleRetry}>Reintentar</button>
+          {window.__DASH_DEV__ && this.state.info && (
+            <pre className="mt-3 text-xs overflow-auto max-h-40">{JSON.stringify(this.state.info, null, 2)}</pre>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Evita aplicar el parche más de una vez
 if (!window.__DASH_PROF_PATCHED__) {
   window.__DASH_PROF_PATCHED__ = true;
@@ -658,6 +687,10 @@ if (!window.__DASH_PROF_PATCHED__) {
                     Sincronizar con filtros de Análisis
                   </label>
                 </div>
+                <p className="mt-2 text-xs text-gray-600 text-right max-w-md ml-auto">
+                  Cuando está desactivado, los gráficos muestran el panorama general del conjunto de datos cargado.
+                  Al activarlo, los gráficos se sincronizan con los mismos filtros aplicados en las tablas de Análisis.
+                </p>
                 <DashboardCharts
                   rowsArea={chartRowsArea}
                   rowsAsignatura={chartRowsAsig}
@@ -1222,9 +1255,10 @@ function formatNota(n){
         const reader = new FileReader();
 
         reader.onload = (e) => {
+          // [SafeProcess] manejo robusto de errores y cierre de overlay
           try {
             // [OverlayPhase] secuencia de fases
-            setProcessingPhase('Importando…');
+            setProcessingPhase?.('Importando…');
             const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
 
             if (!wb.SheetNames || wb.SheetNames.length === 0) {
@@ -1234,7 +1268,7 @@ function formatNota(n){
               return;
             }
             
-            setProcessingPhase('Analizando…');
+            setProcessingPhase?.('Analizando…');
             const profiles = importWorkbookToProfiles(wb, f.name);
 
             if (profiles.length === 0) {
@@ -1244,13 +1278,16 @@ function formatNota(n){
               return;
             }
             
-            setProcessingPhase('Consolidando…');
+            setProcessingPhase?.('Consolidando…');
             onWorkbookProcessed(profiles);
           } catch (err) {
-            console.error("Error processing file:", err);
-            setProcessingPhase('Error al procesar. Revise el archivo.');
-            setTimeout(() => setOverlayVisible(false), 2000);
-            setPendingFile(null);
+            console.error('[Procesar] Error durante el procesamiento:', err);
+            // muestra banner no intrusivo (reusa ResourceGuard si lo tienes)
+            (window.showBanner || ((m)=>alert(m)))('Ocurrió un error procesando el archivo. Revisa el formato y vuelve a intentar.');
+          } finally {
+            setProcessingPhase?.('');
+            // oculta overlay de forma segura (ajusta a tu API actual)
+            setOverlayVisible?.(false);
           }
         };
 
@@ -2543,7 +2580,11 @@ function formatNota(n){
     }
 
   const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(<App />);
+  root.render(
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  );
   </script>
 </body>
 </html>
