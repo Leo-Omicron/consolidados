@@ -73,28 +73,25 @@
 
 <!-- Hito 2 (C) – Switch Dev/Prod SÍNCRONO para garantizar React antes de Babel -->
 <script>
-  (function () {
-    // Pega aquí las URLs *development* EXACTAS que usabas antes:
-    var REACT_DEV     = "https://unpkg.com/react@18/umd/react.development.js";      // .../react.development.js
-    var REACTDOM_DEV  = "https://unpkg.com/react-dom@18/umd/react-dom.development.js";   // .../react-dom.development.js
+(function () {
+  // [PinVersions] React 18.2.0 (UMD)
+  var REACT_DEV     = "https://unpkg.com/react@18.2.0/umd/react.development.js";
+  var REACTDOM_DEV  = "https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js";
 
-    // Deriva automáticamente las URLs de producción:
-    var REACT_PROD    = REACT_DEV.replace("development.js", "production.min.js");
-    var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
+  var REACT_PROD    = REACT_DEV.replace("development.js", "production.min.js");
+  var REACTDOM_PROD = REACTDOM_DEV.replace("development.js", "production.min.js");
 
-    var params = new URLSearchParams(location.search);
-    var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
+  var params = new URLSearchParams(location.search);
+  var isProd = (params.get("mode") || "").toLowerCase() === "prod" || window.__PROD__ === true;
 
-    // Inyección SINCRÓNICA con crossorigin (preparación SRI, sin cambiar URLs)
-    var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '" crossorigin="anonymous"><' + '/script>';
-    var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '" crossorigin="anonymous"><' + '/script>';
-    document.write(r1);
-    document.write(r2);
-  })();
+  var r1 = '<script src="' + (isProd ? REACT_PROD : REACT_DEV) + '" crossorigin="anonymous"><' + '/script>';
+  var r2 = '<script src="' + (isProd ? REACTDOM_PROD : REACTDOM_DEV) + '" crossorigin="anonymous"><' + '/script>';
+  document.write(r1); document.write(r2);
+})();
 </script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
-  <!-- Chart.js para gráficos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
+  <!-- Chart.js 4.4.4 UMD -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
   <script>
     // Flag persistente para silenciar errores externos en DEV
     (function () {
@@ -423,6 +420,15 @@ if (!window.__DASH_PROF_PATCHED__) {
             <h3 className="font-semibold mb-2 text-center">Distribución de Estados</h3>
             <p className="text-xs text-gray-500 text-center mb-2">Cantidad de estudiantes por estado académico (área principal).</p>
             <canvas ref={barRef} height="180" aria-label="Distribución de estados (barras)" role="img"></canvas>
+            <button
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              onClick={() => downloadCanvasPNG(
+                barRef.current,
+                `grafico_distribucion_estados_${new Date().toISOString().slice(0,10)}.png`
+              )}
+            >
+              Exportar PNG
+            </button>
             <table className="mt-2 text-xs w-full border">
               <caption className="sr-only">Distribución de estudiantes por estado académico</caption>
               <thead>
@@ -445,6 +451,15 @@ if (!window.__DASH_PROF_PATCHED__) {
             <h3 className="font-semibold mb-2 text-center">Estados (Pastel)</h3>
             <p className="text-xs text-gray-500 text-center mb-2">Proporción de estudiantes por estado académico.</p>
             <canvas ref={pieRef} height="180" aria-label="Distribución de estados (pastel)" role="img"></canvas>
+            <button
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              onClick={() => downloadCanvasPNG(
+                pieRef.current,
+                `grafico_estados_pastel_${new Date().toISOString().slice(0,10)}.png`
+              )}
+            >
+              Exportar PNG
+            </button>
             <table className="mt-2 text-xs w-full border">
               <caption className="sr-only">Proporción de estudiantes por estado académico</caption>
               <thead>
@@ -467,6 +482,15 @@ if (!window.__DASH_PROF_PATCHED__) {
             <h3 className="font-semibold mb-2 text-center">Promedio por Área (Radar)</h3>
             <p className="text-xs text-gray-500 text-center mb-2">Promedio general de notas por área académica.</p>
             <canvas ref={radarRef} height="180" aria-label="Promedio por área (radar)" role="img"></canvas>
+            <button
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              onClick={() => downloadCanvasPNG(
+                radarRef.current,
+                `grafico_promedio_area_${new Date().toISOString().slice(0,10)}.png`
+              )}
+            >
+              Exportar PNG
+            </button>
             <table className="mt-2 text-xs w-full border">
               <caption className="sr-only">Promedio general de notas por área académica</caption>
               <thead>
@@ -869,7 +893,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     }
     // ...resto del código React...
   </script>
-  <!-- SheetJS -->
+  <!-- SheetJS/XLSX 0.18.5 (build completo) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -935,6 +959,42 @@ function notaFromCell(v) {
     const removeDiacritics = (str) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
     function normTxt(s){ return (s==null?'':String(s)).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); }
+
+// [ExportCSV] convierte filas de objetos a CSV y dispara descarga
+function exportToCSV(filename, rows, columns) {
+  const esc = (v) => {
+    if (v == null) return '';
+    const s = String(v).replace(/\r?\n/g, ' ');
+    return /[",;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = columns.map(c => esc(c.header || c.title || c.key || c)).join(',');
+  const csv = [header].concat(
+    rows.map(r => columns.map(c => {
+      const key = c.key || c.accessorKey || c.id || c;
+      const val = typeof c.accessor === 'function' ? c.accessor(r) : r[key];
+      return esc(val);
+    }).join(','))
+  ).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// [ExportPNG] descarga un <canvas> como PNG
+function downloadCanvasPNG(canvas, filename) {
+  if (!canvas) return;
+  const url = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL?.(url), 500);
+}
 
     const normalizeName = (s) => {
       let v = toUpperSafe(s);
@@ -1683,6 +1743,29 @@ function formatNota(n){
         console.timeEnd('render:DashboardView');
       });
 
+      // [ExportCSV] columnas a exportar para Áreas (ajusta llaves a tu dataset real)
+      const columnsAreaCSV = [
+        { key: 'CURSO', header: 'CURSO' },
+        { key: 'estudiante', header: 'ESTUDIANTE' },
+        { key: 'area', header: 'AREA' },
+        { key: 'defP1', header: 'P1' },
+        { key: 'defP2', header: 'P2' },
+        { key: 'defP3', header: 'P3' },
+        { key: 'promActual', header: 'DEF' },
+      ];
+
+      // [ExportCSV] columnas a exportar para Asignaturas
+      const columnsAsigCSV = [
+        { key: 'CURSO', header: 'CURSO' },
+        { key: 'area', header: 'AREA' },
+        { key: 'asignatura', header: 'ASIGNATURA' },
+        { key: 'estudiante', header: 'ESTUDIANTE' },
+        { key: 'p1', header: 'P1' },
+        { key: 'p2', header: 'P2' },
+        { key: 'p3', header: 'P3' },
+        { key: 'promActual', header: 'DEF' },
+      ];
+
       return (
         <div className="max-w-screen-xl mx-auto px-2 md:px-6 py-4 md:py-8 space-y-8">
           {/* Panel KPIs */}
@@ -1806,7 +1889,20 @@ function formatNota(n){
           {subtab === 'asignaturas' &&
             <div role="tabpanel">
               <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
-                <h2 className="text-lg font-semibold mb-2 flex items-center"><BarChartIcon className="w-5 h-5 mr-2 text-blue-600"/>Análisis por Asignatura</h2>
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold flex items-center"><BarChartIcon className="w-5 h-5 mr-2 text-blue-600"/>Análisis por Asignatura</h2>
+                  {/* [ExportCSV] botón de exportación CSV (Análisis por Asignatura) */}
+                  <button
+                    className="px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                    onClick={() => exportToCSV(
+                      `analisis_asignatura_${new Date().toISOString().slice(0,10)}.csv`,
+                      filteredRowsAsignatura, // usa exactamente el arreglo que alimenta la tabla visible
+                      columnsAsigCSV
+                    )}
+                  >
+                    Exportar (CSV)
+                  </button>
+                </div>
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
@@ -1853,7 +1949,20 @@ function formatNota(n){
           {subtab === 'areas' &&
             <div role="tabpanel">
               <div className="bg-white border border-gray-200 rounded-xl p-2 md:p-5">
-                <h2 className="text-lg font-semibold mb-2 flex items-center"><DatabaseIcon className="w-5 h-5 mr-2 text-green-600"/>Análisis por Área</h2>
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold flex items-center"><DatabaseIcon className="w-5 h-5 mr-2 text-green-600"/>Análisis por Área</h2>
+                  {/* [ExportCSV] botón de exportación CSV (Análisis por Área) */}
+                  <button
+                    className="px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                    onClick={() => exportToCSV(
+                      `analisis_area_${new Date().toISOString().slice(0,10)}.csv`,
+                      filteredRowsArea, // usa exactamente el arreglo que alimenta la tabla visible
+                      columnsAreaCSV
+                    )}
+                  >
+                    Exportar (CSV)
+                  </button>
+                </div>
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
