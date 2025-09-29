@@ -320,9 +320,9 @@ if (!window.__DASH_PROF_PATCHED__) {
     // ...existing imports and code...
 
     // =============================
-    // Componente de Gráficos (Chart.js)
+    // Componente de Gráficos (Chart.js) - Optimizado con React.memo
     // =============================
-    function DashboardCharts({ rowsArea, rowsAsignatura }) {
+    const DashboardCharts = React.memo(({ rowsArea, rowsAsignatura }) => {
       console.time('render:DashboardCharts');
       const barRef = useRef(null);
       const pieRef = useRef(null);
@@ -509,7 +509,18 @@ if (!window.__DASH_PROF_PATCHED__) {
           </div>
         </div>
       );
-    }
+    }, (prevProps, nextProps) => {
+      // [Performance] Comparación granular para evitar re-renders innecesarios
+      return (
+        Array.isArray(prevProps.rowsArea) && Array.isArray(nextProps.rowsArea) &&
+        Array.isArray(prevProps.rowsAsignatura) && Array.isArray(nextProps.rowsAsignatura) &&
+        prevProps.rowsArea.length === nextProps.rowsArea.length &&
+        prevProps.rowsAsignatura.length === nextProps.rowsAsignatura.length &&
+        // Comparación superficial de primeros elementos para detectar cambios estructurales
+        (prevProps.rowsArea.length === 0 || JSON.stringify(prevProps.rowsArea[0]) === JSON.stringify(nextProps.rowsArea[0])) &&
+        (prevProps.rowsAsignatura.length === 0 || JSON.stringify(prevProps.rowsAsignatura[0]) === JSON.stringify(nextProps.rowsAsignatura[0]))
+      );
+    });
 
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
@@ -795,9 +806,9 @@ if (!window.__DASH_PROF_PATCHED__) {
       );
     }
     // =============================
-    // Componente Consultas/Reportes Rápidos
+    // Componente Consultas/Reportes Rápidos - Optimizado con React.memo
     // =============================
-    function QuickReportsView({ data }) {
+    const QuickReportsView = React.memo(({ data }) => {
       console.time('render:QuickReportsView');
       const [courseFilter, setCourseFilter] = useState('ALL');
 
@@ -954,8 +965,67 @@ if (!window.__DASH_PROF_PATCHED__) {
           </div>
         </div>
       );
-    }
+    }, (prevProps, nextProps) => {
+      // [Performance] Solo re-renderizar si cambia la data
+      return (
+        Array.isArray(prevProps.data) && Array.isArray(nextProps.data) &&
+        prevProps.data.length === nextProps.data.length &&
+        // Comparación rápida de hash para detectar cambios de contenido
+        (prevProps.data.length === 0 || 
+         prevProps.data[0]?.id === nextProps.data[0]?.id &&
+         prevProps.data[0]?.name === nextProps.data[0]?.name)
+      );
+    });
     // ...resto del código React...
+
+    // =============================
+    // Componentes Optimizados para Tablas
+    // =============================
+    // [Performance] Row components memoizados para evitar re-renders innecesarios
+    const AsignaturaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
+      <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+        {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
+        <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+        <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+        <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p1)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p2)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p3)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
+        <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+      </tr>
+    ), (prevProps, nextProps) => {
+      // Comparación optimizada: solo re-renderizar si cambió la fila específica
+      return (
+        prevProps.row.id === nextProps.row.id &&
+        prevProps.row.promActual === nextProps.row.promActual &&
+        prevProps.row.estado?.text === nextProps.row.estado?.text &&
+        prevProps.showCourseCol === nextProps.showCourseCol
+      );
+    });
+
+    const AreaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
+      <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+        {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
+        <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+        <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP1)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP2)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP3)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
+        <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+      </tr>
+    ), (prevProps, nextProps) => {
+      // Comparación optimizada para filas de área
+      return (
+        prevProps.row.id === nextProps.row.id &&
+        prevProps.row.promActual === nextProps.row.promActual &&
+        prevProps.row.estado?.text === nextProps.row.estado?.text &&
+        prevProps.showCourseCol === nextProps.showCourseCol
+      );
+    });
   </script>
   <!-- SheetJS/XLSX 0.18.5 (build completo) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
@@ -2188,18 +2258,12 @@ function formatNota(n){
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsAsignatura.map(row => (
-                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
-                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                          <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p1)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p2)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p3)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
-                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                        </tr>
+                        <AsignaturaTableRow 
+                          key={`${row.CURSO || 'SINGLE'}-${row.id}`}
+                          row={row}
+                          showCourseCol={showCourseCol}
+                          getRowClass={getRowClass}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -2247,17 +2311,12 @@ function formatNota(n){
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsArea.map(row => (
-                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
-                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP1)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP2)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP3)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
-                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                        </tr>
+                        <AreaTableRow 
+                          key={`${row.CURSO || 'SINGLE'}-${row.id}`}
+                          row={row}
+                          showCourseCol={showCourseCol}
+                          getRowClass={getRowClass}
+                        />
                       ))}
                     </tbody>
                   </table>
