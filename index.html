@@ -234,11 +234,9 @@
     var b = document.createElement('div');
     b.id = 'res-guard-banner';
     b.setAttribute('role', 'status');
-    b.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;padding:10px;border-radius:8px;background:#111827;color:#F9FAFB;font:14px/1.4 system-ui,Segoe UI,Roboto;box-shadow:0 4px 16px rgba(0,0,0,.2)';
     b.textContent = '⚠️ ' + msg + ' ';
     var close = document.createElement('button');
     close.textContent = 'Cerrar';
-    close.style.cssText = 'margin-left:8px;padding:4px 8px;border-radius:6px;border:1px solid #374151;background:#1F2937;color:#F3F4F6;cursor:pointer';
     close.onclick = function () { b.remove(); };
     b.appendChild(close);
     document.body.appendChild(b);
@@ -965,11 +963,46 @@ if (!window.__DASH_PROF_PATCHED__) {
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, "Noto Sans", 'Apple Color Emoji', 'Segoe UI Emoji'; }
     .highlight-unitary { background-color: #f0f9ff; border-left: 3px solid #3b82f6; }
+    #dev-badge {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 9999;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: #111827;
+      color: #F9FAFB;
+      font: 12px/1 system-ui,Segoe UI,Roboto;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      display: none;
+    }
+    #res-guard-banner {
+      position: fixed;
+      bottom: 8px;
+      left: 8px;
+      right: 8px;
+      z-index: 9999;
+      padding: 10px;
+      border-radius: 8px;
+      background: #111827;
+      color: #F9FAFB;
+      font: 14px/1.4 system-ui,Segoe UI,Roboto;
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    }
+    #res-guard-banner button {
+      margin-left: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background: #1F2937;
+      color: #F3F4F6;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 <!-- [DevBadge] insertar tras <body> o antes del root -->
-<div id="dev-badge" style="display:none;position:fixed;top:8px;right:8px;z-index:9999;padding:4px 8px;border-radius:8px;background:#111827;color:#F9FAFB;font:12px/1 system-ui,Segoe UI,Roboto;box-shadow:0 2px 8px rgba(0,0,0,.25)">DEV</div>
+<div id="dev-badge">DEV</div>
 
 <script>
 // [DevBadge] mostrar solo en desarrollo
@@ -1628,6 +1661,31 @@ function formatNota(n){
       );
     };
 
+    function DebouncedInput({ value: propValue, onChange, wait = 300, ...props }) {
+      const [localValue, setLocalValue] = useState(propValue);
+
+      const debouncedOnChange = useMemo(
+        () => debounce(onChange, wait),
+        [onChange, wait]
+      );
+
+      useEffect(() => {
+        // Sincroniza el valor local si el valor de la prop cambia desde fuera
+        // (ej. al limpiar filtros)
+        if (propValue !== localValue) {
+          setLocalValue(propValue);
+        }
+      }, [propValue]);
+
+      const handleChange = (e) => {
+        const newValue = e.target.value;
+        setLocalValue(newValue);
+        debouncedOnChange(newValue);
+      };
+
+      return <input {...props} value={localValue} onChange={handleChange} />;
+    }
+
     const ReconciliationView = ({ report, onConfirm, onBack, acceptChecks }) => {
       const { sourceCounts, processedCounts, log, fileName } = report;
       const areaDiff = processedCounts.areaCount - sourceCounts.areaCount;
@@ -2009,7 +2067,7 @@ function formatNota(n){
             )}
             <div>
               <label className="block text-xs font-medium text-gray-700">Filtrar por Estudiante</label>
-              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estudiante..." value={studentFilter} onChange={e=>setStudentFilter(e.target.value)} />
+              <DebouncedInput type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estudiante..." value={studentFilter} onChange={setStudentFilter} />
               <select className="mt-2 w-full border rounded-md p-2" value={studentFilter} onChange={e=>setStudentFilter(e.target.value)}>
                 <option value="">Todos</option>
                 {studentList.map(s => <option key={s}>{s}</option>)}
@@ -2017,7 +2075,7 @@ function formatNota(n){
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700">Filtrar por Área</label>
-              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar área..." value={areaFilter} onChange={e=>setAreaFilter(e.target.value)} />
+              <DebouncedInput type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar área..." value={areaFilter} onChange={setAreaFilter} />
               <select className="mt-2 w-full border rounded-md p-2" value={areaFilter} onChange={e=>setAreaFilter(e.target.value)}>
                 <option value="">Todas</option>
                 {areaList.map(a => <option key={a}>{a}</option>)}
@@ -2025,7 +2083,7 @@ function formatNota(n){
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700">Filtrar por Asignatura</label>
-              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar asignatura..." value={asigFilter} onChange={e=>setAsigFilter(e.target.value)} />
+              <DebouncedInput type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar asignatura..." value={asigFilter} onChange={setAsigFilter} />
               <select className="mt-2 w-full border rounded-md p-2" value={asigFilter} onChange={e=>setAsigFilter(e.target.value)}>
                 <option value="">Todas</option>
                 {asigList.map(a => <option key={a}>{a}</option>)}
@@ -2033,7 +2091,7 @@ function formatNota(n){
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700">Filtrar por Estado Académico</label>
-              <input type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estado..." value={estadoFilter} onChange={e=>setEstadoFilter(e.target.value)} />
+              <DebouncedInput type="text" className="mt-1 w-full border rounded-md p-2" placeholder="Buscar estado..." value={estadoFilter} onChange={setEstadoFilter} />
               <select className="mt-2 w-full border rounded-md p-2" value={estadoFilter} onChange={e=>setEstadoFilter(e.target.value)}>
                 <option value="">Todos</option>
                 {estadoList.map(e => <option key={e}>{e}</option>)}
