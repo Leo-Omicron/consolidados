@@ -537,16 +537,29 @@ if (!window.__DASH_PROF_PATCHED__) {
       tabs[nextIdx].click(); // asegura selección al navegar
     }
 
-    function DashboardTabs({ dashboardData, onReset, fileName, derived, syncChartsWithFilters, setSyncChartsWithFilters }) {
+    function DashboardTabs({ dashboardData, onReset, fileName, derived, setDerived, syncChartsWithFilters, setSyncChartsWithFilters }) {
       console.debug('[Tabs] received derived', { has: !!derived, rowsArea: Array.isArray(derived?.rowsArea) ? derived.rowsArea.length : 'NA' });
-      const [tab, setTab] = useState('analisis');
+      // [TabsPersist] estado de pestaña con persistencia
+      const [tab, setTab] = React.useState(() => localStorage.getItem('ui_tab') || 'analisis');
 
-      // LIFTED STATE from DashboardView
-      const [courseFilterDV, setCourseFilterDV] = useState('ALL');
-      const [studentFilter, setStudentFilter] = useState('');
-      const [areaFilter, setAreaFilter] = useState('');
-      const [asigFilter, setAsigFilter] = useState('');
-      const [estadoFilter, setEstadoFilter] = useState('');
+      // [TabsPersist] guardar pestaña al cambiar
+      React.useEffect(() => {
+        try { localStorage.setItem('ui_tab', tab); } catch(_) {}
+      }, [tab]);
+
+      // [FiltersPersist] LIFTED STATE from DashboardView, inicialización desde localStorage
+      const [courseFilterDV, setCourseFilterDV] = React.useState(() => localStorage.getItem('flt_curso') || 'ALL');
+      const [studentFilter, setStudentFilter] = React.useState(() => localStorage.getItem('flt_student') || '');
+      const [areaFilter, setAreaFilter] = React.useState(() => localStorage.getItem('flt_area') || '');
+      const [asigFilter, setAsigFilter] = React.useState(() => localStorage.getItem('flt_asig') || '');
+      const [estadoFilter, setEstadoFilter] = React.useState(() => localStorage.getItem('flt_estado') || '');
+
+      // [FiltersPersist] escritura en localStorage
+      React.useEffect(() => { localStorage.setItem('flt_curso', courseFilterDV || 'ALL'); }, [courseFilterDV]);
+      React.useEffect(() => { localStorage.setItem('flt_student', studentFilter || ''); }, [studentFilter]);
+      React.useEffect(() => { localStorage.setItem('flt_area', areaFilter || ''); }, [areaFilter]);
+      React.useEffect(() => { localStorage.setItem('flt_asig', asigFilter || ''); }, [asigFilter]);
+      React.useEffect(() => { localStorage.setItem('flt_estado', estadoFilter || ''); }, [estadoFilter]);
 
       const dataForAnalysis = useMemo(() => {
         if (!Array.isArray(dashboardData)) return [];
@@ -684,9 +697,62 @@ if (!window.__DASH_PROF_PATCHED__) {
 
           <div className="bg-white rounded-lg shadow p-4">
             {tab === 'analisis' && (
-              <div role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis">
-                <DashboardView
-                  data={dataForAnalysis}
+                            <div role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis">
+                              <div className="flex justify-end mb-2 gap-2">
+                                  {/* [FiltersReset] botón para limpiar filtros */}
+                                  <button
+                                    className="px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                                    onClick={() => {
+                                      setCourseFilterDV('ALL');
+                                      setStudentFilter('');
+                                      setAreaFilter('');
+                                      setAsigFilter('');
+                                      setEstadoFilter('');
+                                    }}
+                                  >
+                                    Limpiar filtros
+                                  </button>
+                                  {/* [BackupJSON] botón Exportar backup (.json) */}
+                                  <button
+                                    className="px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                                    onClick={() => downloadJSON(
+                                      `dashboard_backup_${new Date().toISOString().slice(0,10)}.json`,
+                                      {
+                                        dashboardData: dashboardData,
+                                        rowsArea: filteredRowsArea,
+                                        rowsAsignatura: filteredRowsAsignatura,
+                                        filtroCurso: courseFilterDV,
+                                        filtroEstudiante: studentFilter,
+                                        filtroArea: areaFilter,
+                                        filtroAsignatura: asigFilter,
+                                        filtroEstado: estadoFilter,
+                                        syncChartsWithFilters: syncChartsWithFilters
+                                      }
+                                    )}
+                                  >
+                                    Exportar backup (.json)
+                                  </button>
+                                  {/* [RestoreJSON] botón para restaurar desde backup */}
+                                  <button
+                                    className="px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                                    onClick={() => restoreFromJSONFile((data) => {
+                                      setDerived(prev => ({
+                                        ...prev,
+                                        rowsArea: data.rowsArea || prev?.rowsArea || [],
+                                        rowsAsignatura: data.rowsAsignatura || prev?.rowsAsignatura || [],
+                                      }));
+                                      if ('filtroCurso' in data) setCourseFilterDV(data.filtroCurso || 'ALL');
+                                      if ('filtroArea' in data) setAreaFilter(data.filtroArea || '');
+                                      if ('filtroAsignatura' in data) setAsigFilter(data.filtroAsignatura || '');
+                                      if ('filtroEstudiante' in data) setStudentFilter(data.filtroEstudiante || '');
+                                      if ('filtroEstado' in data) setEstadoFilter(data.filtroEstado || '');
+                                      if ('syncChartsWithFilters' in data) setSyncChartsWithFilters(!!data.syncChartsWithFilters);
+                                    })}
+                                  >
+                                    Restaurar backup (.json)
+                                  </button>
+                              </div>
+                               <DashboardView                  data={dataForAnalysis}
                   onReset={onReset}
                   fileName={fileName}
                   derived={derived}
@@ -902,6 +968,26 @@ if (!window.__DASH_PROF_PATCHED__) {
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
+<!-- [DevBadge] insertar tras <body> o antes del root -->
+<div id="dev-badge" style="display:none;position:fixed;top:8px;right:8px;z-index:9999;padding:4px 8px;border-radius:8px;background:#111827;color:#F9FAFB;font:12px/1 system-ui,Segoe UI,Roboto;box-shadow:0 2px 8px rgba(0,0,0,.25)">DEV</div>
+
+<script>
+// [DevBadge] mostrar solo en desarrollo
+(function(){
+  try {
+    var isDevMode = (document.documentElement?.dataset?.mode || '').toLowerCase() === 'dev';
+    var dashDev = !!window.__DASH_DEV__;
+    var el = document.getElementById('dev-badge');
+    if (!el) return;
+    if (isDevMode || dashDev) { el.style.display = 'inline-block'; }
+    // actualizar si el usuario activa __DASH_DEV__ en runtime
+    Object.defineProperty(window, '__DASH_DEV__', {
+      set(v){ this.__dash_dev_flag=v; el.style.display = (v || isDevMode) ? 'inline-block' : 'none'; },
+      get(){ return this.__dash_dev_flag === true; }
+    });
+  } catch(_) {}
+})();
+</script>
   <header class="w-full bg-gradient-to-r from-blue-900 via-yellow-400 to-green-700 shadow-lg py-3 px-4 flex items-center justify-between">
     <div class="flex items-center gap-4">
   <img src="escudo-el-carmen.jpg" alt="Escudo IE El Carmen" class="rounded-full border-2 border-white shadow-md bg-white object-cover w-12 h-12" />
@@ -911,10 +997,18 @@ if (!window.__DASH_PROF_PATCHED__) {
       </div>
     </div>
   </header>
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useRef, useEffect, Fragment, useMemo } = React;
+    <div id="root"></div>
+  
+    <div id="loading-overlay" class="fixed inset-0 z-[9999] bg-gray-100 flex items-center justify-center">
+      <div class="text-center">
+          <p class="text-lg font-semibold text-gray-800">Cargando aplicación...</p>
+          <p class="text-sm text-gray-600">Por favor, espera un momento.</p>
+      </div>
+    </div>
+  
+    <input id="restore-json-input" type="file" accept="application/json" className="hidden" aria-label="Cargar archivo de backup en formato JSON">
+  
+     <script type="text/babel">    const { useState, useRef, useEffect, Fragment, useMemo } = React;
 
     // ==============================
     // Iconos (Lucide-like minimal)
@@ -994,6 +1088,64 @@ function downloadCanvasPNG(canvas, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL?.(url), 500);
+}
+
+// [BackupJSON] descarga un objeto como .json
+function downloadJSON(filename, data) {
+  try {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  } catch (err) {
+    console.error('[BackupJSON]', err);
+    (window.showBanner || ((m)=>alert(m)))('No se pudo exportar el backup JSON.');
+  }
+}
+
+// [RestoreJSON] lee un archivo .json y aplica estado derivado de forma segura
+function restoreFromJSONFile(onData){
+  const input = document.getElementById('restore-json-input');
+  if (!input) return;
+  input.value = '';
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // Validación mínima de esquema
+      if (!Array.isArray(data?.rowsArea) || !Array.isArray(data?.rowsAsignatura)) {
+        throw new Error('Estructura inválida: faltan rowsArea/rowsAsignatura');
+      }
+      onData(data);
+      (window.showBanner || ((m)=>alert(m)))('Backup restaurado correctamente.');
+    } catch (err) {
+      console.error('[RestoreJSON]', err);
+      (window.showBanner || ((m)=>alert(m)))('No se pudo restaurar el backup JSON.');
+    }
+  };
+  input.click();
+}
+
+// [RestoreJSON][Nav] llevar a la vista de Dashboard de forma resiliente
+function navigateToDashboard(){
+  try { if (typeof setActiveTab === 'function') setActiveTab('Analisis'); } catch(_) {}
+  try { if (typeof setShowUpload === 'function') setShowUpload(false); } catch(_) {}
+  try { if (typeof setCurrentView === 'function') setCurrentView('Dashboard'); } catch(_) {}
+  try { if (typeof setRoute === 'function') setRoute('dashboard'); } catch(_) {}
+  try { if (typeof setScreen === 'function') setScreen('dashboard'); } catch(_) {}
+  try { if (typeof setHasData === 'function') setHasData(true); } catch(_) {}
+  try { localStorage.setItem('hasDerivedData','true'); } catch(_) {}
+  // scroll al inicio por claridad
+  try { window.scrollTo({top:0, behavior:'auto'}); } catch(_) {}
+}
+
+// [Debounce] util simple
+function debounce(fn, wait=200){
+  let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), wait); };
 }
 
     const normalizeName = (s) => {
@@ -1284,141 +1436,149 @@ function formatNota(n){
       return <span className={`px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${color}`}>{icon}{status.text}</span>;
     };
 
-    const UploadView = ({ onWorkbookProcessed, onLoading }) => {
-      const safeLoading = {
-        start: (msg) => { try { onLoading?.start?.(msg); } catch {} },
-        update: (msg) => { try { onLoading?.update?.(msg); } catch {} },
-        stop: () => { try { onLoading?.stop?.(); } catch {} },
-      };
-      const [pendingFile, setPendingFile] = useState(null);
-      const [isDragging, setIsDragging] = useState(false);
-      const inputRef = useRef(null);
-      const [overlayVisible, setOverlayVisible] = useState(false);
-      // [OverlayPhase] estado de fase de procesamiento
-      const [processingPhase, setProcessingPhase] = useState('');
-
-      const handleSelected = (flist) => {
-        if (!flist || flist.length === 0) return;
-        const f = flist[0];
-        setPendingFile(f);
-        if (inputRef.current) inputRef.current.value = '';
-      };
-
-      const handleProcessClick = async () => {
-        if (!pendingFile) return;
-
-        setProcessingPhase('');
-        setOverlayVisible(true);
-        await new Promise(resolve => requestAnimationFrame(resolve));
-
-        const f = pendingFile;
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-          // [SafeProcess] manejo robusto de errores y cierre de overlay
-          try {
-            // [OverlayPhase] secuencia de fases
-            setProcessingPhase?.('Importando…');
-            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-
-            if (!wb.SheetNames || wb.SheetNames.length === 0) {
-              setProcessingPhase('Error: El archivo no contiene hojas.');
+        const UploadView = ({ onWorkbookProcessed, onRestore, onLoading }) => {
+          const safeLoading = {
+            start: (msg) => { try { onLoading?.start?.(msg); } catch {} },
+            update: (msg) => { try { onLoading?.update?.(msg); } catch {} },
+            stop: () => { try { onLoading?.stop?.(); } catch {} },
+          };
+          const [pendingFile, setPendingFile] = useState(null);
+          const [isDragging, setIsDragging] = useState(false);
+          const inputRef = useRef(null);
+          const [overlayVisible, setOverlayVisible] = useState(false);
+          // [OverlayPhase] estado de fase de procesamiento
+          const [processingPhase, setProcessingPhase] = useState('');
+    
+          const handleSelected = (flist) => {
+            if (!flist || flist.length === 0) return;
+            const f = flist[0];
+            setPendingFile(f);
+            if (inputRef.current) inputRef.current.value = '';
+          };
+    
+          const handleProcessClick = async () => {
+            if (!pendingFile) return;
+    
+            setProcessingPhase('');
+            setOverlayVisible(true);
+            await new Promise(resolve => requestAnimationFrame(resolve));
+    
+            const f = pendingFile;
+            const reader = new FileReader();
+    
+            reader.onload = (e) => {
+              // [SafeProcess] manejo robusto de errores y cierre de overlay
+              try {
+                // [OverlayPhase] secuencia de fases
+                setProcessingPhase?.('Importando…');
+                const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+    
+                if (!wb.SheetNames || wb.SheetNames.length === 0) {
+                  setProcessingPhase('Error: El archivo no contiene hojas.');
+                  setTimeout(() => setOverlayVisible(false), 2000);
+                  setPendingFile(null);
+                  return;
+                }
+                
+                setProcessingPhase?.('Analizando…');
+                const profiles = importWorkbookToProfiles(wb, f.name);
+    
+                if (profiles.length === 0) {
+                  setProcessingPhase('Error: Estructura inválida.');
+                  setTimeout(() => setOverlayVisible(false), 2000);
+                  setPendingFile(null);
+                  return;
+                }
+                
+                setProcessingPhase?.('Consolidando…');
+                onWorkbookProcessed(profiles);
+              } catch (err) {
+                console.error('[Procesar] Error durante el procesamiento:', err);
+                // muestra banner no intrusivo (reusa ResourceGuard si lo tienes)
+                (window.showBanner || ((m)=>alert(m)))('Ocurrió un error procesando el archivo. Revisa el formato y vuelve a intentar.');
+              } finally {
+                setProcessingPhase?.('');
+                // oculta overlay de forma segura (ajusta a tu API actual)
+                setOverlayVisible?.(false);
+              }
+            };
+    
+            reader.onerror = () => {
+              setProcessingPhase('Error al leer el archivo.');
               setTimeout(() => setOverlayVisible(false), 2000);
               setPendingFile(null);
-              return;
-            }
-            
-            setProcessingPhase?.('Analizando…');
-            const profiles = importWorkbookToProfiles(wb, f.name);
-
-            if (profiles.length === 0) {
-              setProcessingPhase('Error: Estructura inválida.');
-              setTimeout(() => setOverlayVisible(false), 2000);
-              setPendingFile(null);
-              return;
-            }
-            
-            setProcessingPhase?.('Consolidando…');
-            onWorkbookProcessed(profiles);
-          } catch (err) {
-            console.error('[Procesar] Error durante el procesamiento:', err);
-            // muestra banner no intrusivo (reusa ResourceGuard si lo tienes)
-            (window.showBanner || ((m)=>alert(m)))('Ocurrió un error procesando el archivo. Revisa el formato y vuelve a intentar.');
-          } finally {
-            setProcessingPhase?.('');
-            // oculta overlay de forma segura (ajusta a tu API actual)
-            setOverlayVisible?.(false);
-          }
-        };
-
-        reader.onerror = () => {
-          setProcessingPhase('Error al leer el archivo.');
-          setTimeout(() => setOverlayVisible(false), 2000);
-          setPendingFile(null);
-        };
-
-        reader.readAsArrayBuffer(f);
-      };
-
-      const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); handleSelected(e.dataTransfer.files); };
-      const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(e.type === 'dragenter' || e.type === 'dragover'); };
-
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6">
-          <div className="w-full max-w-3xl">
-            <h1 className="text-3xl font-bold text-center">Dashboard Académico</h1>
-            <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
-            <div className="space-y-4">
-              <div
-                onDrop={handleDrop}
-                onDragEnter={handleDrag}
-                onDragOver={handleDrag}
-                onDragLeave={handleDrag}
-                className={`relative flex flex-col items-center justify-center w-full p-10 border-2 border-dashed rounded-xl cursor-pointer transition ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
-                onClick={() => inputRef.current?.click()}
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                    <span className="text-sm font-mono">XLSX</span>
-                  </div>
-                  <p className="font-semibold text-gray-800">Arrastra y suelta un archivo aquí</p>
-                  <p className="text-sm text-gray-500">o</p>
-                  <button
-                    type="button"
-                    className="mt-1 inline-flex items-center px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            };
+    
+            reader.readAsArrayBuffer(f);
+          };
+    
+          const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); handleSelected(e.dataTransfer.files); };
+          const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(e.type === 'dragenter' || e.type === 'dragover'); };
+    
+          return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-6">
+              <div className="w-full max-w-3xl">
+                <h1 className="text-3xl font-bold text-center">Dashboard Académico</h1>
+                <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
+                <div className="space-y-4">
+                  <div
+                    onDrop={handleDrop}
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    className={`relative flex flex-col items-center justify-center w-full p-10 border-2 border-dashed rounded-xl cursor-pointer transition ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'}`}
+                    onClick={() => inputRef.current?.click()}
                   >
-                    Seleccionar archivo
-                  </button>
-                  <p className="text-xs text-gray-500 mt-2">Cada hoja se importará como curso.</p>
-                </div>
-
-                {/* input real */}
-                <input
-                  ref={inputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e)=>handleSelected(e.target.files)}
-                  accept=".xlsx,.xls,.csv"
-                  aria-label="Seleccionar archivo Excel o CSV para importar cursos"
-                />
-              </div>
-              {pendingFile && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">Archivo seleccionado:</p>
-                    <p className="text-sm text-blue-700">{pendingFile.name}</p>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                        <span className="text-sm font-mono">XLSX</span>
+                      </div>
+                      <p className="font-semibold text-gray-800">Arrastra y suelta un archivo aquí</p>
+                      <p className="text-sm text-gray-500">o</p>
+                      <button
+                        type="button"
+                        className="mt-1 inline-flex items-center px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        Seleccionar archivo
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2">Cada hoja se importará como curso.</p>
+                    </div>
+    
+                    {/* input real */}
+                    <input
+                      ref={inputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e)=>handleSelected(e.target.files)}
+                      accept=".xlsx,.xls,.csv"
+                      aria-label="Seleccionar archivo Excel o CSV para importar cursos"
+                    />
                   </div>
-                  <button
-                    onClick={handleProcessClick}
-                    className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700"
-                  >
-                    Procesar archivo
-                  </button>
+                  {pendingFile && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Archivo seleccionado:</p>
+                        <p className="text-sm text-blue-700">{pendingFile.name}</p>
+                      </div>
+                      <button
+                        onClick={handleProcessClick}
+                        className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700"
+                      >
+                        Procesar archivo
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-          {overlayVisible && (
+                <div className="mt-4 text-center">
+                    {/* [RestoreJSON][Inicio] botón en pantalla inicial */}
+                    <button
+                      className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+                      onClick={() => restoreFromJSONFile(onRestore)}
+                    >
+                      Restaurar backup (.json)
+                    </button>
+                </div>
+               </div>          {overlayVisible && (
             <div className="fixed inset-0 z-50 bg-white/70 backdrop-blur-sm flex items-center justify-center" role="status" aria-live="assertive">
               <div className="flex flex-col items-center">
                 <div className="animate-spin h-10 w-10 rounded-full border-4 border-blue-300 border-t-blue-600"></div>
@@ -2408,6 +2568,11 @@ function formatNota(n){
           setView('dashboard');
         } catch (e) {
           console.error('Restore courses error:', e);
+        } finally {
+          const overlay = document.getElementById('loading-overlay');
+          if (overlay) {
+            overlay.style.display = 'none';
+          }
         }
       }, []);
 
@@ -2503,6 +2668,47 @@ function formatNota(n){
 
       const handleReset = () => { setProcessed(null); setAnalysisData(null); setView('upload'); setQualityLog([]); };
 
+      const handleRestore = (data) => {
+        if (data.dashboardData) {
+            setAnalysisData(data.dashboardData);
+
+            const coursesMap = new Map();
+            data.dashboardData.forEach(student => {
+                const courseName = student.CURSO || 'Restaurado';
+                if (!coursesMap.has(courseName)) {
+                    coursesMap.set(courseName, []);
+                }
+                coursesMap.get(courseName).push(student);
+            });
+
+            const restoredCourses = Array.from(coursesMap.entries()).map(([name, courseData]) => ({
+                name: name,
+                data: courseData
+            }));
+
+            setCourses(restoredCourses);
+            if (restoredCourses.length > 1) {
+                setSelectedCourse('ALL');
+            } else if (restoredCourses.length === 1) {
+                setSelectedCourse(restoredCourses[0].name);
+            }
+        }
+
+        const newDerived = {
+            ...buildDerived(data.dashboardData || []),
+            rowsArea: data.rowsArea,
+            rowsAsignatura: data.rowsAsignatura,
+        };
+        setDerived(newDerived);
+
+        if ('syncChartsWithFilters' in data) {
+            setSyncChartsWithFilters(!!data.syncChartsWithFilters);
+        }
+
+        setView('dashboard');
+        setProcessed({ fileName: 'Restaurado desde backup.json' });
+      };
+
       // Eliminar el curso actualmente seleccionado (si no es ALL)
       const handleDeleteCurrentCourse = () => {
         if (!selectedCourse || selectedCourse === 'ALL') {
@@ -2577,6 +2783,7 @@ function formatNota(n){
           {view==='upload' && (
             <UploadView
               onWorkbookProcessed={handleWorkbookProcessed}
+              onRestore={handleRestore}
               onLoading={{ start: showLoading, update: updateLoading, stop: hideLoading }}
             />
           )}
@@ -2677,7 +2884,7 @@ function formatNota(n){
                 }}
               />
             </div>
-            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} syncChartsWithFilters={syncChartsWithFilters} setSyncChartsWithFilters={setSyncChartsWithFilters} />
+            <DashboardTabs dashboardData={dashboardData} onReset={handleReset} fileName={processed.fileName} derived={derived} setDerived={setDerived} syncChartsWithFilters={syncChartsWithFilters} setSyncChartsWithFilters={setSyncChartsWithFilters} />
             <div className="max-w-7xl mx-auto px-6 pb-10 text-xs text-gray-500">
               <button onClick={downloadQualityLog} className="mb-2 bg-gray-700 text-white px-3 py-1 rounded-md text-sm hover:bg-black">Descargar Log de Calidad (JSON)</button>              <hr className="my-6"/>
               <p><strong>Nota:</strong> El análisis de calidad de datos se realiza internamente y está disponible para consulta administrativa.</p>
