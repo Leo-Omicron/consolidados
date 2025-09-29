@@ -1482,11 +1482,60 @@ function formatNota(n){
           // [OverlayPhase] estado de fase de procesamiento
           const [processingPhase, setProcessingPhase] = useState('');
     
+          // [FileValidation] Validación robusta de archivos
+          const validateFile = (file) => {
+            const MAX_SIZE = 15 * 1024 * 1024; // 15MB límite razonable
+            const ALLOWED_TYPES = [
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+              'application/vnd.ms-excel', // .xls
+              'text/csv',
+              'application/csv',
+              'text/plain' // algunos CSV llegan como text/plain
+            ];
+            const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+            
+            // Validar tamaño
+            if (file.size > MAX_SIZE) {
+              throw new Error(`Archivo demasiado grande (${(file.size/1024/1024).toFixed(1)}MB). Máximo permitido: 15MB`);
+            }
+            
+            // Validar extensión (más confiable que MIME type)
+            const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+            if (!ALLOWED_EXTENSIONS.includes(ext)) {
+              throw new Error(`Tipo de archivo no soportado: ${ext || 'sin extensión'}. Use: .xlsx, .xls o .csv`);
+            }
+            
+            // Validar MIME type si está disponible (algunos browsers no lo detectan bien)
+            if (file.type && !ALLOWED_TYPES.includes(file.type) && !file.type.includes('sheet') && !file.type.includes('excel') && !file.type.includes('csv')) {
+              console.warn(`MIME type no reconocido: ${file.type}, pero extensión válida: ${ext}`);
+            }
+            
+            return true;
+          };
+
           const handleSelected = (flist) => {
             if (!flist || flist.length === 0) return;
             const f = flist[0];
-            setPendingFile(f);
-            if (inputRef.current) inputRef.current.value = '';
+            
+            try {
+              // [FileValidation] Validar archivo antes de aceptarlo
+              validateFile(f);
+              setPendingFile(f);
+              if (inputRef.current) inputRef.current.value = '';
+            } catch (error) {
+              // Mostrar error al usuario de forma amigable
+              const showError = window.showBanner || alert;
+              showError(`❌ ${error.message}`);
+              
+              // Limpiar input para permitir reselección
+              if (inputRef.current) inputRef.current.value = '';
+              setPendingFile(null);
+              
+              // Log para desarrollo
+              if (window.__DASH_DEV__) {
+                console.error('[FileValidation]', error, { fileName: f.name, size: f.size, type: f.type });
+              }
+            }
           };
     
           const handleProcessClick = async () => {
