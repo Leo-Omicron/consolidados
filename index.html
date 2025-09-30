@@ -34,6 +34,23 @@
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // [THEME CONFIG] Configurar Tailwind para dark mode
+    tailwind.config = {
+      darkMode: 'class', // Enable class-based dark mode
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              900: '#1e3a8a'
+            }
+          }
+        }
+      }
+    }
+  </script>
   <!-- React + ReactDOM + Babel -->
   <!-- BACKUP (rollback rápido):
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -320,9 +337,9 @@ if (!window.__DASH_PROF_PATCHED__) {
     // ...existing imports and code...
 
     // =============================
-    // Componente de Gráficos (Chart.js)
+    // Componente de Gráficos (Chart.js) - Optimizado con React.memo
     // =============================
-    function DashboardCharts({ rowsArea, rowsAsignatura }) {
+    const DashboardCharts = React.memo(({ rowsArea, rowsAsignatura }) => {
       console.time('render:DashboardCharts');
       const barRef = useRef(null);
       const pieRef = useRef(null);
@@ -377,27 +394,144 @@ if (!window.__DASH_PROF_PATCHED__) {
           type: 'bar',
           data: {
             labels: estados,
-            datasets: [{ label: 'Distribución de Estados', data: estadoCounts, backgroundColor: ['#ef4444','#fbbf24','#3b82f6','#06b6d4','#22c55e'] }]
+            datasets: [{ 
+              label: 'Distribución de Estados', 
+              data: estadoCounts, 
+              backgroundColor: ['#ef4444','#fbbf24','#3b82f6','#06b6d4','#22c55e'],
+              borderColor: ['#dc2626','#f59e0b','#2563eb','#0891b2','#16a34a'],
+              borderWidth: 1,
+              borderRadius: 4 // [MODERN] Esquinas redondeadas
+            }]
           },
-          options: { responsive: true, plugins: { legend: { display: false } } }
+          options: { 
+            responsive: true, 
+            plugins: { 
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.label}: ${context.parsed.y} estudiantes`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
+                },
+                ticks: {
+                  color: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                },
+                ticks: {
+                  color: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151'
+                }
+              }
+            }
+          }
         });
 
         mk('pie', pieRef, {
-          type: 'pie',
+          type: 'doughnut', // [UPGRADE] Cambiado a doughnut para look más moderno
           data: {
             labels: estados,
-            datasets: [{ label: 'Estados', data: estadoCounts, backgroundColor: ['#ef4444','#fbbf24','#3b82f6','#06b6d4','#22c55e'] }]
+            datasets: [{ 
+              label: 'Estados', 
+              data: estadoCounts, 
+              backgroundColor: ['#ef4444','#fbbf24','#3b82f6','#06b6d4','#22c55e'],
+              borderWidth: 2,
+              borderColor: '#ffffff', // Borde blanco entre segmentos
+              hoverBorderWidth: 3
+            }]
           },
-          options: { responsive: true }
+          options: { 
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  padding: 15,
+                  usePointStyle: true,
+                  font: { size: 11 }
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = ((value / total) * 100).toFixed(1);
+                    return `${label}: ${value} estudiantes (${percentage}%)`;
+                  }
+                }
+              }
+            },
+            cutout: '60%' // [DONUT] Agujero en el centro
+          }
         });
 
         mk('radar', radarRef, {
           type: 'radar',
           data: {
             labels: areaLabels,
-            datasets: [{ label: 'Promedio por Área', data: areaProms, backgroundColor: 'rgba(59,130,246,0.2)', borderColor: '#3b82f6' }]
+            datasets: [{ 
+              label: 'Promedio por Área', 
+              data: areaProms, 
+              backgroundColor: 'rgba(59,130,246,0.2)', 
+              borderColor: '#3b82f6',
+              borderWidth: 2,
+              pointBackgroundColor: '#3b82f6',
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2,
+              pointRadius: 5,
+              pointHoverRadius: 7
+            }]
           },
-          options: { responsive: true }
+          options: { 
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  color: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151'
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.label}: ${context.parsed.r.toFixed(2)} promedio`;
+                  }
+                }
+              }
+            },
+            scales: {
+              r: {
+                beginAtZero: true,
+                max: 5,
+                grid: {
+                  color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
+                },
+                angleLines: {
+                  color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
+                },
+                ticks: {
+                  color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#6b7280',
+                  backdropColor: 'transparent'
+                },
+                pointLabels: {
+                  color: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151',
+                  font: { size: 10 }
+                }
+              }
+            }
+          }
         });
 
         return () => {
@@ -414,12 +548,12 @@ if (!window.__DASH_PROF_PATCHED__) {
 
       return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-4">
-          <div>
-            <h3 className="font-semibold mb-2 text-center">Distribución de Estados</h3>
-            <p className="text-xs text-gray-500 text-center mb-2">Cantidad de estudiantes por estado académico (área principal).</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow transition-colors">
+            <h3 className="font-semibold mb-2 text-center text-gray-900 dark:text-white">Distribución de Estados</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">Cantidad de estudiantes por estado académico (área principal).</p>
             <canvas ref={barRef} height="180" aria-label="Distribución de estados (barras)" role="img"></canvas>
             <button
-              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               onClick={() => downloadCanvasPNG(
                 barRef.current,
                 `grafico_distribucion_estados_${new Date().toISOString().slice(0,10)}.png`
@@ -427,61 +561,61 @@ if (!window.__DASH_PROF_PATCHED__) {
             >
               Exportar PNG
             </button>
-            <table className="mt-2 text-xs w-full border">
+            <table className="mt-2 text-xs w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
               <caption className="sr-only">Distribución de estudiantes por estado académico</caption>
               <thead>
-                <tr className="bg-gray-100">
-                  <th scope="col" className="border px-1">Estado</th>
-                  <th scope="col" className="border px-1">Cantidad</th>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Estado</th>
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Cantidad</th>
                 </tr>
               </thead>
               <tbody>
                 {estados.map((e, i) => (
-                  <tr key={e}>
-                    <td className="border px-1">{e}</td>
-                    <td className="border px-1">{estadoCounts[i]}</td>
+                  <tr key={e} className="bg-white dark:bg-gray-800">
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{e}</td>
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{estadoCounts[i]}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div>
-            <h3 className="font-semibold mb-2 text-center">Estados (Pastel)</h3>
-            <p className="text-xs text-gray-500 text-center mb-2">Proporción de estudiantes por estado académico.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow transition-colors">
+            <h3 className="font-semibold mb-2 text-center text-gray-900 dark:text-white">Estados (Donut)</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">Proporción de estudiantes por estado académico.</p>
             <canvas ref={pieRef} height="180" aria-label="Distribución de estados (pastel)" role="img"></canvas>
             <button
-              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               onClick={() => downloadCanvasPNG(
                 pieRef.current,
-                `grafico_estados_pastel_${new Date().toISOString().slice(0,10)}.png`
+                `grafico_estados_donut_${new Date().toISOString().slice(0,10)}.png`
               )}
             >
               Exportar PNG
             </button>
-            <table className="mt-2 text-xs w-full border">
+            <table className="mt-2 text-xs w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
               <caption className="sr-only">Proporción de estudiantes por estado académico</caption>
               <thead>
-                <tr className="bg-gray-100">
-                  <th scope="col" className="border px-1">Estado</th>
-                  <th scope="col" className="border px-1">Cantidad</th>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Estado</th>
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Cantidad</th>
                 </tr>
               </thead>
               <tbody>
                 {estados.map((e, i) => (
-                  <tr key={e}>
-                    <td className="border px-1">{e}</td>
-                    <td className="border px-1">{estadoCounts[i]}</td>
+                  <tr key={e} className="bg-white dark:bg-gray-800">
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{e}</td>
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{estadoCounts[i]}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div>
-            <h3 className="font-semibold mb-2 text-center">Promedio por Área (Radar)</h3>
-            <p className="text-xs text-gray-500 text-center mb-2">Promedio general de notas por área académica.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow transition-colors">
+            <h3 className="font-semibold mb-2 text-center text-gray-900 dark:text-white">Promedio por Área (Radar)</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">Promedio general de notas por área académica.</p>
             <canvas ref={radarRef} height="180" aria-label="Promedio por área (radar)" role="img"></canvas>
             <button
-              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm"
+              className="mt-2 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               onClick={() => downloadCanvasPNG(
                 radarRef.current,
                 `grafico_promedio_area_${new Date().toISOString().slice(0,10)}.png`
@@ -489,19 +623,19 @@ if (!window.__DASH_PROF_PATCHED__) {
             >
               Exportar PNG
             </button>
-            <table className="mt-2 text-xs w-full border">
+            <table className="mt-2 text-xs w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
               <caption className="sr-only">Promedio general de notas por área académica</caption>
               <thead>
-                <tr className="bg-gray-100">
-                  <th scope="col" className="border px-1">Área</th>
-                  <th scope="col" className="border px-1">Promedio</th>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Área</th>
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Promedio</th>
                 </tr>
               </thead>
               <tbody>
                 {(areaLabels || []).map((a, i) => (
                   <tr key={a}>
-                    <td className="border px-1">{a}</td>
-                    <td className="border px-1">{areaProms[i]}</td>
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{a}</td>
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{areaProms[i]}</td>
                   </tr>
                 ))}
               </tbody>
@@ -509,7 +643,18 @@ if (!window.__DASH_PROF_PATCHED__) {
           </div>
         </div>
       );
-    }
+    }, (prevProps, nextProps) => {
+      // [Performance] Comparación granular para evitar re-renders innecesarios
+      return (
+        Array.isArray(prevProps.rowsArea) && Array.isArray(nextProps.rowsArea) &&
+        Array.isArray(prevProps.rowsAsignatura) && Array.isArray(nextProps.rowsAsignatura) &&
+        prevProps.rowsArea.length === nextProps.rowsArea.length &&
+        prevProps.rowsAsignatura.length === nextProps.rowsAsignatura.length &&
+        // Comparación superficial de primeros elementos para detectar cambios estructurales
+        (prevProps.rowsArea.length === 0 || JSON.stringify(prevProps.rowsArea[0]) === JSON.stringify(nextProps.rowsArea[0])) &&
+        (prevProps.rowsAsignatura.length === 0 || JSON.stringify(prevProps.rowsAsignatura[0]) === JSON.stringify(nextProps.rowsAsignatura[0]))
+      );
+    });
 
     // =============================
     // Tabs para navegación (Análisis / Gráficos) con A11y
@@ -795,9 +940,9 @@ if (!window.__DASH_PROF_PATCHED__) {
       );
     }
     // =============================
-    // Componente Consultas/Reportes Rápidos
+    // Componente Consultas/Reportes Rápidos - Optimizado con React.memo
     // =============================
-    function QuickReportsView({ data }) {
+    const QuickReportsView = React.memo(({ data }) => {
       console.time('render:QuickReportsView');
       const [courseFilter, setCourseFilter] = useState('ALL');
 
@@ -954,8 +1099,67 @@ if (!window.__DASH_PROF_PATCHED__) {
           </div>
         </div>
       );
-    }
+    }, (prevProps, nextProps) => {
+      // [Performance] Solo re-renderizar si cambia la data
+      return (
+        Array.isArray(prevProps.data) && Array.isArray(nextProps.data) &&
+        prevProps.data.length === nextProps.data.length &&
+        // Comparación rápida de hash para detectar cambios de contenido
+        (prevProps.data.length === 0 || 
+         prevProps.data[0]?.id === nextProps.data[0]?.id &&
+         prevProps.data[0]?.name === nextProps.data[0]?.name)
+      );
+    });
     // ...resto del código React...
+
+    // =============================
+    // Componentes Optimizados para Tablas
+    // =============================
+    // [Performance] Row components memoizados para evitar re-renders innecesarios
+    const AsignaturaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
+  <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-100 ${getRowClass(row.estado)}`}>
+        {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
+        <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+        <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+        <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p1)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p2)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.p3)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
+        <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+      </tr>
+    ), (prevProps, nextProps) => {
+      // Comparación optimizada: solo re-renderizar si cambió la fila específica
+      return (
+        prevProps.row.id === nextProps.row.id &&
+        prevProps.row.promActual === nextProps.row.promActual &&
+        prevProps.row.estado?.text === nextProps.row.estado?.text &&
+        prevProps.showCourseCol === nextProps.showCourseCol
+      );
+    });
+
+    const AreaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
+  <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-100 ${getRowClass(row.estado)}`}>
+        {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
+        <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
+        <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP1)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP2)}</td>
+        <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP3)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
+        <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
+        <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
+      </tr>
+    ), (prevProps, nextProps) => {
+      // Comparación optimizada para filas de área
+      return (
+        prevProps.row.id === nextProps.row.id &&
+        prevProps.row.promActual === nextProps.row.promActual &&
+        prevProps.row.estado?.text === nextProps.row.estado?.text &&
+        prevProps.showCourseCol === nextProps.showCourseCol
+      );
+    });
   </script>
   <!-- SheetJS/XLSX 0.18.5 (build completo) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
@@ -1029,18 +1233,84 @@ if (!window.__DASH_PROF_PATCHED__) {
         <span class="text-xs md:text-sm text-white/80 font-semibold">Dashboard Institucional</span>
       </div>
     </div>
+    
+    <!-- [THEME TOGGLE] Botón de cambio de tema -->
+    <div class="flex items-center gap-3">
+      <button 
+        id="theme-toggle" 
+        class="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors duration-200 text-white"
+        title="Cambiar tema"
+        aria-label="Alternar modo oscuro"
+      >
+        <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+        </svg>
+        <svg id="theme-icon-dark" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+        </svg>
+      </button>
+    </div>
   </header>
     <div id="root"></div>
   
-    <div id="loading-overlay" class="fixed inset-0 z-[9999] bg-gray-100 flex items-center justify-center">
+    <div id="loading-overlay" class="fixed inset-0 z-[9999] bg-gray-100 dark:bg-gray-900 flex items-center justify-center transition-colors">
       <div class="text-center">
-          <p class="text-lg font-semibold text-gray-800">Cargando aplicación...</p>
-          <p class="text-sm text-gray-600">Por favor, espera un momento.</p>
+          <p class="text-lg font-semibold text-gray-800 dark:text-white">Cargando aplicación...</p>
+          <p class="text-sm text-gray-600 dark:text-gray-300">Por favor, espera un momento.</p>
       </div>
     </div>
   
     <input id="restore-json-input" type="file" accept="application/json" className="hidden" aria-label="Cargar archivo de backup en formato JSON">
   
+    <!-- [THEME SYSTEM] Gestión de temas oscuro/claro -->
+    <script>
+      // Theme management with localStorage persistence
+      const ThemeManager = {
+        getStoredTheme: () => localStorage.getItem('theme') || 'light',
+        setStoredTheme: (theme) => localStorage.setItem('theme', theme),
+        
+        applyTheme: (theme) => {
+          const html = document.documentElement;
+          const lightIcon = document.getElementById('theme-icon-light');
+          const darkIcon = document.getElementById('theme-icon-dark');
+          
+          if (theme === 'dark') {
+            html.classList.add('dark');
+            if (lightIcon) lightIcon.classList.remove('hidden');
+            if (darkIcon) darkIcon.classList.add('hidden');
+          } else {
+            html.classList.remove('dark');
+            if (lightIcon) lightIcon.classList.add('hidden');
+            if (darkIcon) darkIcon.classList.remove('hidden');
+          }
+        },
+        
+        toggle: () => {
+          const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+          const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+          ThemeManager.setStoredTheme(newTheme);
+          ThemeManager.applyTheme(newTheme);
+        },
+        
+        init: () => {
+          const storedTheme = ThemeManager.getStoredTheme();
+          ThemeManager.applyTheme(storedTheme);
+          
+          // Add click listener to toggle button
+          const toggleBtn = document.getElementById('theme-toggle');
+          if (toggleBtn) {
+            toggleBtn.addEventListener('click', ThemeManager.toggle);
+          }
+        }
+      };
+      
+      // Initialize theme system when DOM is ready
+      document.addEventListener('DOMContentLoaded', ThemeManager.init);
+      
+      // Also try immediate initialization for dynamic content
+      setTimeout(ThemeManager.init, 100);
+    </script>
+
      <script type="text/babel">    const { useState, useRef, useEffect, Fragment, useMemo } = React;
 
     // ==============================
@@ -1057,6 +1327,41 @@ if (!window.__DASH_PROF_PATCHED__) {
     const InfoIcon = (p) => <Icon {...p} path={<Fragment><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Fragment>} />
     const DatabaseIcon = (p) => <Icon {...p} path={<Fragment><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></Fragment>} />
     const BarChartIcon = (p) => <Icon {...p} path={<Fragment><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></Fragment>} />
+
+    // =============================================
+    // [TOOLTIP] Componente informativo reutilizable
+    // =============================================
+    const Tooltip = ({ children, content, position = 'top' }) => {
+      const [isVisible, setIsVisible] = useState(false);
+      
+      const positionClasses = {
+        top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-2',
+        bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-2',
+        left: 'right-full top-1/2 transform -translate-y-1/2 mr-2',
+        right: 'left-full top-1/2 transform -translate-y-1/2 ml-2'
+      };
+
+      return (
+        <div 
+          className="relative inline-block"
+          onMouseEnter={() => setIsVisible(true)}
+          onMouseLeave={() => setIsVisible(false)}
+        >
+          {children}
+          {isVisible && (
+            <div className={`absolute z-[10000] px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg max-w-xs whitespace-normal ${positionClasses[position]}`}>
+              {content}
+              <div className={`absolute w-2 h-2 bg-gray-900 dark:bg-gray-700 transform rotate-45 ${
+                position === 'top' ? 'top-full left-1/2 -translate-x-1/2 -mt-1' :
+                position === 'bottom' ? 'bottom-full left-1/2 -translate-x-1/2 -mb-1' :
+                position === 'left' ? 'left-full top-1/2 -translate-y-1/2 -ml-1' :
+                'right-full top-1/2 -translate-y-1/2 -mr-1'
+              }`}></div>
+            </div>
+          )}
+        </div>
+      );
+    };
 
     // =============================================
     // Utilidades: normalización y helpers del parser
@@ -1482,11 +1787,60 @@ function formatNota(n){
           // [OverlayPhase] estado de fase de procesamiento
           const [processingPhase, setProcessingPhase] = useState('');
     
+          // [FileValidation] Validación robusta de archivos
+          const validateFile = (file) => {
+            const MAX_SIZE = 15 * 1024 * 1024; // 15MB límite razonable
+            const ALLOWED_TYPES = [
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+              'application/vnd.ms-excel', // .xls
+              'text/csv',
+              'application/csv',
+              'text/plain' // algunos CSV llegan como text/plain
+            ];
+            const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+            
+            // Validar tamaño
+            if (file.size > MAX_SIZE) {
+              throw new Error(`Archivo demasiado grande (${(file.size/1024/1024).toFixed(1)}MB). Máximo permitido: 15MB`);
+            }
+            
+            // Validar extensión (más confiable que MIME type)
+            const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+            if (!ALLOWED_EXTENSIONS.includes(ext)) {
+              throw new Error(`Tipo de archivo no soportado: ${ext || 'sin extensión'}. Use: .xlsx, .xls o .csv`);
+            }
+            
+            // Validar MIME type si está disponible (algunos browsers no lo detectan bien)
+            if (file.type && !ALLOWED_TYPES.includes(file.type) && !file.type.includes('sheet') && !file.type.includes('excel') && !file.type.includes('csv')) {
+              console.warn(`MIME type no reconocido: ${file.type}, pero extensión válida: ${ext}`);
+            }
+            
+            return true;
+          };
+
           const handleSelected = (flist) => {
             if (!flist || flist.length === 0) return;
             const f = flist[0];
-            setPendingFile(f);
-            if (inputRef.current) inputRef.current.value = '';
+            
+            try {
+              // [FileValidation] Validar archivo antes de aceptarlo
+              validateFile(f);
+              setPendingFile(f);
+              if (inputRef.current) inputRef.current.value = '';
+            } catch (error) {
+              // Mostrar error al usuario de forma amigable
+              const showError = window.showBanner || alert;
+              showError(`❌ ${error.message}`);
+              
+              // Limpiar input para permitir reselección
+              if (inputRef.current) inputRef.current.value = '';
+              setPendingFile(null);
+              
+              // Log para desarrollo
+              if (window.__DASH_DEV__) {
+                console.error('[FileValidation]', error, { fileName: f.name, size: f.size, type: f.type });
+              }
+            }
           };
     
           const handleProcessClick = async () => {
@@ -1549,10 +1903,10 @@ function formatNota(n){
           const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(e.type === 'dragenter' || e.type === 'dragover'); };
     
           return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6">
+            <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-gray-900 transition-colors">
               <div className="w-full max-w-3xl">
-                <h1 className="text-3xl font-bold text-center">Dashboard Académico</h1>
-                <p className="text-center text-gray-600 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
+                <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white">Dashboard Académico</h1>
+                <p className="text-center text-gray-600 dark:text-gray-300 mb-6">Sube un archivo de Excel para analizar las notas (soporte multi-hojas).</p>
                 <div className="space-y-4">
                   <div
                     onDrop={handleDrop}
@@ -1996,7 +2350,14 @@ function formatNota(n){
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Promedio general de notas (áreas):</p>
-                  <span className="text-3xl font-bold text-blue-600">{promGeneral}</span>
+                  <Tooltip 
+                    content="Promedio aritmético de todas las notas perdidas. Indica el nivel general de desempeño académico del grupo." 
+                    position="bottom"
+                  >
+                    <span className="text-3xl font-bold text-blue-600 border-b border-dotted border-blue-400 cursor-help">
+                      {promGeneral}
+                    </span>
+                  </Tooltip>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Porcentaje de estudiantes por estado académico:</p>
@@ -2009,13 +2370,30 @@ function formatNota(n){
                       </tr>
                     </thead>
                     <tbody>
-                      {estados.map((e,i)=>(
-                        <tr key={e}>
-                          <td className="px-2 py-1">{e}</td>
-                          <td className="px-2 py-1 text-right">{estadoCounts[i]}</td>
-                          <td className="px-2 py-1 text-right">{dataForAnalysis.length>0 ? ((estadoCounts[i]/dataForAnalysis.length)*100).toFixed(1)+'%' : '0%'}</td>
-                        </tr>
-                      ))}
+                      {estados.map((e,i)=>{
+                        // [TOOLTIPS] Descripciones de estados académicos
+                        const tooltipContent = {
+                          'Perdido': 'Promedio mayor o igual a 5.0. Requiere refuerzo académico inmediato.',
+                          'En riesgo': 'Promedio entre 4.0 y 4.9. Necesita atención preventiva.',
+                          'Recuperable': 'Promedio entre 3.0 y 3.9. Con apoyo puede mejorar.',
+                          'Ganable': 'Promedio entre 2.5 y 2.9. Situación favorable.',
+                          'Ganado': 'Promedio menor a 2.5. Excelente rendimiento académico.'
+                        }[e] || 'Estado académico basado en el promedio de notas perdidas.';
+                        
+                        return (
+                          <tr key={e}>
+                            <td className="px-2 py-1">
+                              <Tooltip content={tooltipContent} position="right">
+                                <span className="border-b border-dotted border-gray-400 cursor-help">
+                                  {e}
+                                </span>
+                              </Tooltip>
+                            </td>
+                            <td className="px-2 py-1 text-right">{estadoCounts[i]}</td>
+                            <td className="px-2 py-1 text-right">{dataForAnalysis.length>0 ? ((estadoCounts[i]/dataForAnalysis.length)*100).toFixed(1)+'%' : '0%'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2124,7 +2502,7 @@ function formatNota(n){
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
+                      <tr className="dark:bg-gray-800 dark:text-gray-100">
                         {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
@@ -2139,18 +2517,12 @@ function formatNota(n){
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsAsignatura.map(row => (
-                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
-                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                          <td className="px-3 py-3 text-sm text-gray-600">{row.asignatura}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p1)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p2)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.p3)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
-                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                        </tr>
+                        <AsignaturaTableRow 
+                          key={`${row.CURSO || 'SINGLE'}-${row.id}`}
+                          row={row}
+                          showCourseCol={showCourseCol}
+                          getRowClass={getRowClass}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -2184,7 +2556,7 @@ function formatNota(n){
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
+                      <tr className="dark:bg-gray-800 dark:text-gray-100">
                         {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
@@ -2198,17 +2570,12 @@ function formatNota(n){
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {pagedRowsArea.map(row => (
-                        <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
-                          {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
-                          <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
-                          <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP1)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP2)}</td>
-                          <td className="px-3 py-3 text-sm text-right">{formatNota(row.defP3)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.promActual)}</td>
-                          <td className="px-3 py-3 text-sm text-right font-semibold">{formatNota(row.p4Min)}</td>
-                          <td className="px-3 py-3 text-sm text-center"><StatusBadge status={row.estado} /></td>
-                        </tr>
+                        <AreaTableRow 
+                          key={`${row.CURSO || 'SINGLE'}-${row.id}`}
+                          row={row}
+                          showCourseCol={showCourseCol}
+                          getRowClass={getRowClass}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -2795,28 +3162,48 @@ function formatNota(n){
       };
 
       const LoadingOverlay = ({ show, message }) => {
+        // [CRONÓMETRO] Simple timer sin complejidad
+        const [seconds, setSeconds] = useState(0);
+        
+        useEffect(() => {
+          if (!show) {
+            setSeconds(0);
+            return;
+          }
+          
+          const timer = setInterval(() => {
+            setSeconds(prev => prev + 1);
+          }, 1000);
+          
+          return () => clearInterval(timer);
+        }, [show]);
+        
         if (!show) return null;
         return (
           <div
             role="status"
             aria-live="assertive"
-            className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-6"
+            className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4 sm:p-6"
           >
-            <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center gap-4">
+            <div className="w-full max-w-sm sm:max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 sm:p-6 transition-colors">
+              <div className="flex items-center gap-3 sm:gap-4">
                 {/* Spinner simple accesible */}
-                <svg className="animate-spin h-8 w-8" viewBox="0 0 24 24" aria-hidden="true">
+                <svg className="animate-spin h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" d="M4 12a8 8 0 018-8" fill="currentColor"></path>
                 </svg>
                 <div>
-                  <p className="font-semibold">Trabajando…</p>
-                  <p className="text-sm text-gray-600">{message || 'Procesando datos, por favor espera.'}</p>
+                  <p className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">Trabajando…</p>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">{message || 'Procesando datos, por favor espera.'}</p>
                 </div>
               </div>
               {/* Barra indeterminada */}
-              <div className="mt-4 h-2 w-full bg-gray-200 rounded overflow-hidden" aria-hidden="true">
-                <div className="h-full w-1/3 bg-blue-600 animate-[loader_1.2s_infinite]"></div>
+              <div className="mt-3 sm:mt-4 h-2 w-full bg-gray-200 dark:bg-gray-700 rounded overflow-hidden" aria-hidden="true">
+                <div className="h-full w-1/3 bg-blue-600 dark:bg-blue-400 animate-[loader_1.2s_infinite]"></div>
+              </div>
+              {/* [CRONÓMETRO] Tiempo transcurrido */}
+              <div className="mt-2 sm:mt-3 text-center">
+                <span className="text-xs text-gray-500 dark:text-gray-400">⏱️ {seconds}s</span>
               </div>
               <style>{`@keyframes loader{0%{transform:translateX(-100%)}50%{transform:translateX(100%)}100%{transform:translateX(200%)}}`}</style>
             </div>

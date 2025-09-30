@@ -10,31 +10,47 @@ La herramienta está construida como una aplicación web de una sola página (`S
 
 ## Características Principales
 
-- **Carga de Archivos:** Soporta la carga de archivos de Excel (`.xlsx`, `.xls`) y CSV.
-- **Análisis Multi-hoja:** Cada hoja de cálculo en el archivo de Excel se importa como un "curso" independiente, permitiendo consolidar datos de múltiples grupos.
-- **Visualización de Datos:**
-    - **Tablas Detalladas:** Muestra las notas por estudiante, asignatura y área, con filtros dinámicos.
-    - **Gráficos Interactivos:** Incluye gráficos de barras, pastel y radar para visualizar distribuciones y promedios.
-    - **KPIs (Indicadores Clave):** Presenta resúmenes del promedio general, distribución de estados académicos (Ganado, En Riesgo, Perdido, etc.) y áreas con mayor dificultad.
-- **Cálculos Automáticos:**
-    - Calcula el promedio actual de los estudiantes.
-    - Proyecta la nota mínima requerida en el último periodo para aprobar.
-    - Asigna un "estado académico" a cada estudiante para una fácil identificación.
-- **Reportes Rápidos:** Genera listas automáticas para identificar:
-    - Estudiantes con promedios más bajos.
-    - Estudiantes con más áreas perdidas o en riesgo.
-    - Mejores y peores desempeños globales.
-- **Persistencia de Datos:** Guarda los datos cargados en la memoria del navegador (`localStorage`) para que la información esté disponible en futuras visitas sin necesidad de volver a cargar el archivo.
-- **Interfaz Moderna:** Desarrollada con un diseño limpio y responsivo, accesible desde computadoras de escritorio y dispositivos móviles.
+### 🎯 **Gestión de Datos Avanzada**
+
+-   **Carga Multi-formato:** Soporta Excel (`.xlsx`, `.xls`) y CSV con validación robusta
+-   **Análisis Multi-hoja:** Procesamiento inteligente de múltiples hojas como cursos independientes
+-   **Normalización Automática:** Sistema de limpieza y estructuración de datos con log de calidad
+-   **Estados Derivados:** Pre-cálculo optimizado de `rowsArea` y `rowsAsignatura` para performance
+
+### 📊 **Visualización y Análisis**
+
+-   **Tablas Inteligentes:** Filtros dinámicos con persistencia y paginación optimizada
+-   **Gráficos Interactivos:** Chart.js con exportación PNG y sincronización con filtros
+-   **KPIs Dinámicos:** Indicadores en tiempo real que responden a filtros aplicados
+-   **Sistema de Estados:** Clasificación automática (Ganado, Ganable, Recuperable, En Riesgo, Perdido)
+
+### 🔧 **Funcionalidades Avanzadas**
+
+-   **Backup/Restore:** Sistema completo de exportación/importación JSON de estado
+-   **Exportación Multi-formato:** CSV para tablas, PNG para gráficos, JSON para backups
+-   **Modo Desarrollo/Producción:** Switch automático con `?mode=dev/prod`
+-   **Filtros Persistentes:** Configuraciones guardadas en localStorage
+-   **Consultas Rápidas:** Reportes automáticos para identificación de riesgos académicos
+
+### ♿ **Accesibilidad y UX**
+
+-   **Navegación Accesible:** Soporte completo de teclado y ARIA
+-   **Responsive Design:** Optimizado para escritorio, tablet y móvil
+-   **Loading Inteligente:** Fases de procesamiento con feedback visual
+-   **Error Boundaries:** Recuperación automática de errores sin pérdida de datos
+-   **Filtros de Ruido:** Silencia errores de extensiones externas automáticamente
 
 ## Tecnologías Utilizadas
 
-- **HTML5**
-- **CSS3** con **Tailwind CSS** para un diseño rápido y moderno.
-- **JavaScript (ES6+)**
-- **React.js** para la construcción de la interfaz de usuario interactiva.
-- **Chart.js** para la generación de gráficos dinámicos.
-- **SheetJS (xlsx)** para la lectura y procesamiento de archivos de Excel.
+-   **HTML5** con arquitectura SPA (Single Page Application)
+-   **CSS3** con **Tailwind CSS** para diseño responsivo y moderno
+-   **JavaScript (ES6+)** con módulos ES y programación funcional
+-   **React.js 18.2.0** para interfaz de usuario reactiva con hooks avanzados
+-   **Chart.js 4.4.4** para gráficos interactivos con exportación PNG
+-   **SheetJS (xlsx) 0.18.5** para procesamiento robusto de archivos Excel
+-   **Babel Standalone** para transpilación JSX en tiempo real
+-   **Sistema de Estados Derivados** para optimización de performance
+-   **Persistencia en localStorage** para mantener configuraciones del usuario
 
 ## ¿Cómo Utilizar?
 
