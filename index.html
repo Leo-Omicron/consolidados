@@ -571,7 +571,7 @@ if (!window.__DASH_PROF_PATCHED__) {
               </thead>
               <tbody>
                 {estados.map((e, i) => (
-                  <tr key={e}>
+                  <tr key={e} className="bg-white dark:bg-gray-800">
                     <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{e}</td>
                     <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{estadoCounts[i]}</td>
                   </tr>
@@ -592,19 +592,19 @@ if (!window.__DASH_PROF_PATCHED__) {
             >
               Exportar PNG
             </button>
-            <table className="mt-2 text-xs w-full border">
+            <table className="mt-2 text-xs w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
               <caption className="sr-only">Proporción de estudiantes por estado académico</caption>
               <thead>
-                <tr className="bg-gray-100">
-                  <th scope="col" className="border px-1">Estado</th>
-                  <th scope="col" className="border px-1">Cantidad</th>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Estado</th>
+                  <th scope="col" className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">Cantidad</th>
                 </tr>
               </thead>
               <tbody>
                 {estados.map((e, i) => (
-                  <tr key={e}>
-                    <td className="border px-1">{e}</td>
-                    <td className="border px-1">{estadoCounts[i]}</td>
+                  <tr key={e} className="bg-white dark:bg-gray-800">
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{e}</td>
+                    <td className="border border-gray-300 dark:border-gray-600 px-1 text-gray-900 dark:text-white">{estadoCounts[i]}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1117,7 +1117,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     // =============================
     // [Performance] Row components memoizados para evitar re-renders innecesarios
     const AsignaturaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
-      <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+  <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-100 ${getRowClass(row.estado)}`}>
         {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
         <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
         <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
@@ -1140,7 +1140,7 @@ if (!window.__DASH_PROF_PATCHED__) {
     });
 
     const AreaTableRow = React.memo(({ row, showCourseCol, getRowClass }) => (
-      <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 ${getRowClass(row.estado)}`}>
+  <tr key={`${row.CURSO || 'SINGLE'}-${row.id}`} className={`hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-100 ${getRowClass(row.estado)}`}>
         {showCourseCol && <td className="px-3 py-3 text-sm text-gray-600">{row.CURSO || ''}</td>}
         <td className="px-3 py-3 font-medium text-gray-900 align-top border-r" style={{minWidth:'120px',maxWidth:'200px'}}>{row.estudiante}</td>
         <td className="px-3 py-3 text-sm font-medium text-gray-700">{row.area}</td>
@@ -2502,7 +2502,7 @@ function formatNota(n){
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
+                      <tr className="dark:bg-gray-800 dark:text-gray-100">
                         {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
@@ -2556,7 +2556,7 @@ function formatNota(n){
                 <div className="overflow-auto max-h-[60vh] border rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
+                      <tr className="dark:bg-gray-800 dark:text-gray-100">
                         {showCourseCol && <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Curso</th>}
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase" style={{ minWidth: '120px', maxWidth: '200px' }}>Estudiante</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Área</th>
