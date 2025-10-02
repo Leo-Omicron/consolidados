@@ -1,0 +1,72 @@
+### 🧩 Integración de Informe de Rendimiento Escolar por Periodos en el Dashboard
+
+**Objetivo:**
+Integrar una nueva funcionalidad en el dashboard que permita **visualizar, analizar y exportar informes detallados del rendimiento escolar por periodo**, destacando los casos de **bajo rendimiento académico**, con generación de **reportes multiformato** (CSV, XLSX, PDF, Word, etc.).
+
+---
+
+### 🔍 Requisitos funcionales:
+
+1. **Análisis por periodo individual:**
+
+   * Generar informes del rendimiento académico por cada uno de los periodos:
+
+     * **1er Periodo**, **2do Periodo**, **3er Periodo**, **4to Periodo**.
+   * En cada informe se deben incluir:
+
+     * Listado de **estudiantes con logros pendientes** o notas bajas, por curso.
+     * Detalle de **asignaturas en las que presentan bajo rendimiento**.
+     * **Notas obtenidas** en ese periodo para cada asignatura.
+     * **Filtros por curso, grado y asignatura.**
+
+2. **Análisis acumulado (combinado) por periodos:**
+
+   * A partir del **2do periodo**, generar informes acumulativos que incluyan el **promedio de rendimiento** del periodo actual **junto con los periodos anteriores**:
+
+     * Ejemplo:
+
+       * Terminado el 2do periodo → Promedio entre 1er y 2do periodo.
+       * Terminado el 3er periodo → Promedio entre 1er, 2do y 3er periodo.
+       * Terminado el 4to periodo → Promedio total del año (1ro al 4to).
+   * Este análisis también debe resaltar los **casos de bajo rendimiento acumulado**, incluyendo:
+
+     * Estudiantes, asignaturas, notas promedio por periodo.
+     * Indicadores de mejora o empeoramiento.
+
+3. **Visualización en el Dashboard:**
+
+   * Incluir una **sección específica o pestaña** dentro del dashboard donde se muestre:
+
+     * Una **tabla dinámica** con estudiantes con bajo rendimiento.
+     * Posibilidad de **filtrar por curso, periodo individual o combinado.**
+     * Posibilidad de **ordenar** por nombre, promedio, asignatura, etc.
+
+4. **Exportación de informes:**
+
+   * Permitir la generación y descarga de informes en los siguientes formatos:
+
+     * **CSV**
+     * **XLSX (Excel)**
+     * **PDF**
+     * **Word (DOCX)**
+   * El usuario debe poder seleccionar:
+
+     * El tipo de informe: Individual por periodo o Combinado.
+     * El curso o grado a analizar.
+     * El formato de exportación deseado.
+
+---
+
+### 🧠 Consideraciones adicionales:
+
+* La lógica de cálculo debe tomar únicamente las **notas disponibles cargadas al sistema**.
+* No se deben generar informes de periodos aún no finalizados.
+* El sistema debe validar la existencia de notas antes de procesar el informe.
+* Se debe garantizar que los datos exportados conserven la estructura, legibilidad y formato.
+
+---
+
+### ✅ Ejemplos de flujo esperado:
+
+* **Ejemplo 1:** El usuario selecciona "2do Periodo → Informe combinado", el sistema genera un promedio entre 1er y 2do periodo y muestra/descarga los resultados.
+* **Ejemplo 2:** El usuario filtra por "3er Periodo → Curso 8°B", selecciona exportar en PDF, y obtiene un listado de estudiantes con bajo rendimiento acumulado hasta el 3er periodo.

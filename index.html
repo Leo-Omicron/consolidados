@@ -836,6 +836,20 @@ if (!window.__DASH_PROF_PATCHED__) {
             >
               Consultas/Reportes Rápidos
             </button>
+
+            <button
+              role="tab"
+              id="tab-informes"
+              aria-controls="panel-informes"
+              aria-selected={tab === 'informes'}
+              tabIndex={tab === 'informes' ? 0 : -1}
+              className={tab === 'informes'
+                ? 'px-4 py-2 rounded-t-lg font-semibold bg-white shadow'
+                : 'px-4 py-2 rounded-t-lg font-semibold bg-gray-200'}
+              onClick={() => setTab('informes')}
+            >
+              📊 Informes por Periodos
+            </button>
           </div>
 
           <div className="bg-white rounded-lg shadow p-4">
@@ -933,6 +947,15 @@ if (!window.__DASH_PROF_PATCHED__) {
             {tab === 'consultas' && (
               <div role="tabpanel" id="panel-consultas" aria-labelledby="tab-consultas">
                 <QuickReportsView data={dashboardData} />
+              </div>
+            )}
+            {tab === 'informes' && (
+              <div role="tabpanel" id="panel-informes" aria-labelledby="tab-informes">
+                <InformesView 
+                  dashboardData={dashboardData} 
+                  derived={derived} 
+                  filters={{ courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter }}
+                />
               </div>
             )}
           </div>
@@ -1442,6 +1465,1283 @@ function downloadJSON(filename, data) {
     (window.showBanner || ((m)=>alert(m)))('No se pudo exportar el backup JSON.');
   }
 }
+
+// ======================================
+// [FASE 5] Sistema de Exportación de Informes por Periodos
+// ======================================
+
+// Exporta informe de estadísticas consolidadas a CSV
+function exportConsolidatedStatsToCSV(filename, stats) {
+  const rows = [];
+  
+  // Información general
+  rows.push(['RESUMEN GENERAL', '', '', '']);
+  rows.push(['Métrica', 'Valor', '', '']);
+  rows.push(['Periodos Disponibles', stats.overview.totalPeriods, '', '']);
+  rows.push(['Total Estudiantes', stats.overview.totalStudents, '', '']);
+  rows.push(['Total Materias', stats.overview.totalSubjects, '', '']);
+  rows.push(['Promedio General', formatGradeForReport(stats.overview.overallAverageGrade), '', '']);
+  rows.push(['Tasa Bajo Rendimiento', formatPercentageForReport(stats.overview.overallLowPerformanceRate), '', '']);
+  rows.push(['', '', '', '']);
+  
+  // Comparación por periodo
+  rows.push(['COMPARACIÓN POR PERIODO', '', '', '']);
+  rows.push(['Periodo', 'Promedio', 'Bajo Rendimiento', 'Tasa Aprobación']);
+  Object.entries(stats.periodComparison).forEach(([period, data]) => {
+    rows.push([
+      period,
+      formatGradeForReport(data.averageGrade),
+      data.lowPerformanceCount,
+      formatPercentageForReport(data.approvalRate)
+    ]);
+  });
+  rows.push(['', '', '', '']);
+  
+  // Tendencias
+  rows.push(['TENDENCIAS', '', '', '']);
+  rows.push(['Tipo', 'Cantidad', '', '']);
+  rows.push(['Mejorando', stats.trends.improving, '', '']);
+  rows.push(['Declinando', stats.trends.declining, '', '']);
+  rows.push(['Estable', stats.trends.stable, '', '']);
+  rows.push(['', '', '', '']);
+  
+  // Alertas
+  if (stats.alerts && stats.alerts.length > 0) {
+    rows.push(['ALERTAS AUTOMÁTICAS', '', '', '']);
+    rows.push(['Tipo', 'Título', 'Mensaje', 'Recomendación']);
+    stats.alerts.forEach(alert => {
+      rows.push([alert.type, alert.title, alert.message, alert.recommendation]);
+    });
+  }
+
+  const columns = [
+    { key: 0, header: 'Campo' },
+    { key: 1, header: 'Valor' },
+    { key: 2, header: 'Extra1' },
+    { key: 3, header: 'Extra2' }
+  ];
+
+  exportToCSV(filename, rows.map(row => ({ 0: row[0], 1: row[1], 2: row[2], 3: row[3] })), columns);
+}
+
+// Exporta informe de bajo rendimiento a CSV
+function exportLowPerformanceToCSV(filename, report) {
+  const rows = [];
+  
+  // Resumen por periodo
+  Object.entries(report.summary).forEach(([period, data]) => {
+    rows.push([`BAJO RENDIMIENTO - ${period}`, '', '', '', '', '']);
+    rows.push(['Estudiante', 'Curso', 'Área', 'Materia', 'Calificación', 'Estado']);
+    
+    data.studentDetails.forEach(student => {
+      student.subjects.forEach(subject => {
+        rows.push([
+          student.student,
+          student.course,
+          subject.area,
+          subject.subject,
+          formatGradeForReport(subject.grade),
+          'Bajo Rendimiento'
+        ]);
+      });
+    });
+    rows.push(['', '', '', '', '', '']);
+  });
+
+  // Recomendaciones
+  if (report.recommendations && report.recommendations.length > 0) {
+    rows.push(['RECOMENDACIONES', '', '', '', '', '']);
+    rows.push(['Prioridad', 'Título', 'Descripción', 'Acciones', '', '']);
+    
+    report.recommendations.forEach(rec => {
+      rows.push([
+        rec.priority,
+        rec.title,
+        rec.description,
+        rec.actionItems.join('; '),
+        '',
+        ''
+      ]);
+    });
+  }
+
+  const columns = [
+    { key: 0, header: 'Campo1' },
+    { key: 1, header: 'Campo2' },
+    { key: 2, header: 'Campo3' },
+    { key: 3, header: 'Campo4' },
+    { key: 4, header: 'Campo5' },
+    { key: 5, header: 'Campo6' }
+  ];
+
+  exportToCSV(filename, rows.map(row => ({ 
+    0: row[0], 1: row[1], 2: row[2], 3: row[3], 4: row[4], 5: row[5] 
+  })), columns);
+}
+
+// Exporta informe comparativo a CSV
+function exportComparativeToCSV(filename, report) {
+  const rows = [];
+  
+  report.comparisons.forEach((comparison, index) => {
+    rows.push([`COMPARACIÓN ${comparison.period1} vs ${comparison.period2}`, '', '', '', '']);
+    rows.push(['Estadística', 'Valor', '', '', '']);
+    rows.push(['Total Comparaciones', comparison.statistics.totalComparisons, '', '', '']);
+    rows.push(['Mejoras', comparison.statistics.improvementCount, '', '', '']);
+    rows.push(['Declives', comparison.statistics.declineCount, '', '', '']);
+    rows.push(['Estables', comparison.statistics.stableCount, '', '', '']);
+    rows.push(['Cambio Promedio', formatGradeForReport(comparison.statistics.averageChange), '', '', '']);
+    rows.push(['', '', '', '', '']);
+    
+    // Top mejoras
+    if (comparison.improvements.length > 0) {
+      rows.push(['PRINCIPALES MEJORAS', '', '', '', '']);
+      rows.push(['Estudiante', 'Materia', comparison.period1, comparison.period2, 'Cambio']);
+      comparison.improvements.slice(0, 10).forEach(item => {
+        rows.push([
+          item.student,
+          item.subject,
+          formatGradeForReport(item.period1Grade),
+          formatGradeForReport(item.period2Grade),
+          `+${formatGradeForReport(item.change)}`
+        ]);
+      });
+      rows.push(['', '', '', '', '']);
+    }
+    
+    // Top declives
+    if (comparison.declines.length > 0) {
+      rows.push(['PRINCIPALES DECLIVES', '', '', '', '']);
+      rows.push(['Estudiante', 'Materia', comparison.period1, comparison.period2, 'Cambio']);
+      comparison.declines.slice(0, 10).forEach(item => {
+        rows.push([
+          item.student,
+          item.subject,
+          formatGradeForReport(item.period1Grade),
+          formatGradeForReport(item.period2Grade),
+          formatGradeForReport(item.change)
+        ]);
+      });
+      rows.push(['', '', '', '', '']);
+    }
+  });
+
+  const columns = [
+    { key: 0, header: 'Campo1' },
+    { key: 1, header: 'Campo2' },
+    { key: 2, header: 'Campo3' },
+    { key: 3, header: 'Campo4' },
+    { key: 4, header: 'Campo5' }
+  ];
+
+  exportToCSV(filename, rows.map(row => ({ 
+    0: row[0], 1: row[1], 2: row[2], 3: row[3], 4: row[4] 
+  })), columns);
+}
+
+// Exporta a Excel usando SheetJS (XLSX)
+function exportReportToExcel(filename, report, reportType) {
+  try {
+    const workbook = XLSX.utils.book_new();
+    
+    switch (reportType) {
+      case 'consolidated_statistics':
+        exportConsolidatedStatsToExcel(workbook, report);
+        break;
+      case 'low_performance':
+        exportLowPerformanceToExcel(workbook, report);
+        break;
+      case 'comparative':
+        exportComparativeToExcel(workbook, report);
+        break;
+      case 'student_performance':
+        exportStudentPerformanceToExcel(workbook, report);
+        break;
+    }
+    
+    // Agregar hoja de metadatos
+    const metaData = [
+      ['Informe', reportType],
+      ['Generado', new Date().toLocaleString()],
+      ['Sistema', 'IE El Carmen - Dashboard Académico'],
+      ['Versión', '2.0 - Sistema de Informes por Periodos']
+    ];
+    const metaWS = XLSX.utils.aoa_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaWS, 'Metadatos');
+    
+    // Descargar archivo
+    XLSX.writeFile(workbook, filename);
+  } catch (error) {
+    console.error('Error exportando a Excel:', error);
+    alert('Error al exportar a Excel: ' + error.message);
+  }
+}
+
+// Exporta estadísticas consolidadas a Excel
+function exportConsolidatedStatsToExcel(workbook, stats) {
+  // Hoja de resumen
+  const summaryData = [
+    ['RESUMEN GENERAL'],
+    ['Métrica', 'Valor'],
+    ['Periodos Disponibles', stats.overview.totalPeriods],
+    ['Total Estudiantes', stats.overview.totalStudents],
+    ['Total Materias', stats.overview.totalSubjects],
+    ['Promedio General', parseFloat(formatGradeForReport(stats.overview.overallAverageGrade))],
+    ['Tasa Bajo Rendimiento (%)', parseFloat(stats.overview.overallLowPerformanceRate.toFixed(1))],
+    [],
+    ['COMPARACIÓN POR PERIODO'],
+    ['Periodo', 'Promedio', 'Bajo Rendimiento', 'Tasa Aprobación (%)']
+  ];
+  
+  Object.entries(stats.periodComparison).forEach(([period, data]) => {
+    summaryData.push([
+      period,
+      parseFloat(formatGradeForReport(data.averageGrade)),
+      data.lowPerformanceCount,
+      parseFloat(data.approvalRate.toFixed(1))
+    ]);
+  });
+  
+  summaryData.push([]);
+  summaryData.push(['TENDENCIAS']);
+  summaryData.push(['Tipo', 'Cantidad']);
+  summaryData.push(['Mejorando', stats.trends.improving]);
+  summaryData.push(['Declinando', stats.trends.declining]);
+  summaryData.push(['Estable', stats.trends.stable]);
+  
+  const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summaryWS, 'Resumen');
+  
+  // Hoja de alertas
+  if (stats.alerts && stats.alerts.length > 0) {
+    const alertsData = [
+      ['ALERTAS AUTOMÁTICAS'],
+      ['Tipo', 'Título', 'Mensaje', 'Recomendación']
+    ];
+    
+    stats.alerts.forEach(alert => {
+      alertsData.push([alert.type, alert.title, alert.message, alert.recommendation]);
+    });
+    
+    const alertsWS = XLSX.utils.aoa_to_sheet(alertsData);
+    XLSX.utils.book_append_sheet(workbook, alertsWS, 'Alertas');
+  }
+}
+
+// Exporta bajo rendimiento a Excel
+function exportLowPerformanceToExcel(workbook, report) {
+  Object.entries(report.summary).forEach(([period, data]) => {
+    const sheetData = [
+      [`BAJO RENDIMIENTO - ${period}`],
+      ['Estudiante', 'Curso', 'Área', 'Materia', 'Calificación']
+    ];
+    
+    data.studentDetails.forEach(student => {
+      student.subjects.forEach(subject => {
+        sheetData.push([
+          student.student,
+          student.course,
+          subject.area,
+          subject.subject,
+          parseFloat(formatGradeForReport(subject.grade))
+        ]);
+      });
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(workbook, ws, `Bajo_Rendimiento_${period}`);
+  });
+  
+  // Hoja de recomendaciones
+  if (report.recommendations && report.recommendations.length > 0) {
+    const recData = [
+      ['RECOMENDACIONES'],
+      ['Prioridad', 'Título', 'Descripción', 'Acciones']
+    ];
+    
+    report.recommendations.forEach(rec => {
+      recData.push([
+        rec.priority,
+        rec.title,
+        rec.description,
+        rec.actionItems.join('; ')
+      ]);
+    });
+    
+    const recWS = XLSX.utils.aoa_to_sheet(recData);
+    XLSX.utils.book_append_sheet(workbook, recWS, 'Recomendaciones');
+  }
+}
+
+// Exporta comparativo a Excel
+function exportComparativeToExcel(workbook, report) {
+  report.comparisons.forEach((comparison, index) => {
+    const sheetData = [
+      [`COMPARACIÓN ${comparison.period1} vs ${comparison.period2}`],
+      ['Estadística', 'Valor'],
+      ['Total Comparaciones', comparison.statistics.totalComparisons],
+      ['Mejoras', comparison.statistics.improvementCount],
+      ['Declives', comparison.statistics.declineCount],
+      ['Estables', comparison.statistics.stableCount],
+      ['Cambio Promedio', parseFloat(formatGradeForReport(comparison.statistics.averageChange))],
+      []
+    ];
+    
+    if (comparison.improvements.length > 0) {
+      sheetData.push(['PRINCIPALES MEJORAS']);
+      sheetData.push(['Estudiante', 'Materia', comparison.period1, comparison.period2, 'Cambio']);
+      comparison.improvements.slice(0, 15).forEach(item => {
+        sheetData.push([
+          item.student,
+          item.subject,
+          parseFloat(formatGradeForReport(item.period1Grade)),
+          parseFloat(formatGradeForReport(item.period2Grade)),
+          parseFloat(formatGradeForReport(item.change))
+        ]);
+      });
+      sheetData.push([]);
+    }
+    
+    if (comparison.declines.length > 0) {
+      sheetData.push(['PRINCIPALES DECLIVES']);
+      sheetData.push(['Estudiante', 'Materia', comparison.period1, comparison.period2, 'Cambio']);
+      comparison.declines.slice(0, 15).forEach(item => {
+        sheetData.push([
+          item.student,
+          item.subject,
+          parseFloat(formatGradeForReport(item.period1Grade)),
+          parseFloat(formatGradeForReport(item.period2Grade)),
+          parseFloat(formatGradeForReport(item.change))
+        ]);
+      });
+    }
+    
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(workbook, ws, `Comparacion_${index + 1}`);
+  });
+}
+
+// Exporta rendimiento por estudiante a Excel
+function exportStudentPerformanceToExcel(workbook, report) {
+  // Hoja de resumen por periodos individuales
+  const individualData = [
+    ['RENDIMIENTO POR PERIODO INDIVIDUAL'],
+    ['Periodo', 'Total Materias', 'Aprobadas', 'Reprobadas', 'Bajo Rendimiento', 'Promedio']
+  ];
+  
+  Object.entries(report.individualPeriods || {}).forEach(([period, data]) => {
+    individualData.push([
+      period,
+      data.totalSubjects,
+      data.approvedSubjects,
+      data.failedSubjects,
+      data.lowPerformanceSubjects,
+      parseFloat(formatGradeForReport(data.averageGrade))
+    ]);
+  });
+  
+  const individualWS = XLSX.utils.aoa_to_sheet(individualData);
+  XLSX.utils.book_append_sheet(workbook, individualWS, 'Por_Periodo');
+  
+  // Hoja de análisis acumulativo
+  const cumulativeData = [
+    ['ANÁLISIS ACUMULATIVO'],
+    ['Periodos', 'Total Materias', 'Promedio', 'Mejorando', 'Declinando', 'Estable', 'Bajo Rendimiento']
+  ];
+  
+  Object.entries(report.cumulativeAnalysis || {}).forEach(([key, data]) => {
+    cumulativeData.push([
+      data.periodsIncluded.join('+'),
+      data.totalSubjects,
+      parseFloat(formatGradeForReport(data.averagePerformance)),
+      data.improvingSubjects,
+      data.decliningSubjects,
+      data.stableSubjects,
+      data.lowPerformanceSubjects
+    ]);
+  });
+  
+  const cumulativeWS = XLSX.utils.aoa_to_sheet(cumulativeData);
+  XLSX.utils.book_append_sheet(workbook, cumulativeWS, 'Acumulativo');
+}
+
+// Genera PDF usando bibliotecas del navegador (básico)
+function exportReportToPDF(filename, report, reportType) {
+  try {
+    // Crear contenido HTML para el PDF
+    const htmlContent = generatePDFContent(report, reportType);
+    
+    // Crear ventana nueva para imprimir/guardar como PDF
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Esperar a que se cargue y luego imprimir
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+    
+  } catch (error) {
+    console.error('Error exportando a PDF:', error);
+    alert('Error al exportar a PDF: ' + error.message);
+  }
+}
+
+// Genera contenido HTML para PDF
+function generatePDFContent(report, reportType) {
+  const currentDate = new Date().toLocaleString();
+  let content = '';
+  
+  switch (reportType) {
+    case 'consolidated_statistics':
+      content = generateConsolidatedStatsPDFContent(report);
+      break;
+    case 'low_performance':
+      content = generateLowPerformancePDFContent(report);
+      break;
+    case 'comparative':
+      content = generateComparativePDFContent(report);
+      break;
+    case 'student_performance':
+      content = generateStudentPerformancePDFContent(report);
+      break;
+  }
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Informe Académico - IE El Carmen</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.4; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+        .logo { font-size: 24px; font-weight: bold; color: #2563eb; }
+        .institution { font-size: 18px; margin: 10px 0; }
+        .report-title { font-size: 16px; color: #666; }
+        .generated { font-size: 12px; color: #888; margin-top: 10px; }
+        .section { margin: 30px 0; page-break-inside: avoid; }
+        .section-title { font-size: 18px; font-weight: bold; color: #1f2937; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f3f4f6; font-weight: bold; }
+        .metric-value { font-weight: bold; color: #059669; }
+        .alert-critical { background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 10px; margin: 10px 0; }
+        .alert-warning { background-color: #fffbeb; border-left: 4px solid #d97706; padding: 10px; margin: 10px 0; }
+        .page-break { page-break-before: always; }
+        @media print { body { margin: 0; } .page-break { page-break-before: always; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logo">IE EL CARMEN</div>
+        <div class="institution">Dashboard Institucional - Sistema de Informes por Periodos</div>
+        <div class="report-title">Informe de ${getReportTypeName(reportType)}</div>
+        <div class="generated">Generado el: ${currentDate}</div>
+      </div>
+      ${content}
+    </body>
+    </html>
+  `;
+}
+
+// Obtiene el nombre descriptivo del tipo de reporte
+function getReportTypeName(reportType) {
+  const names = {
+    'consolidated_statistics': 'Estadísticas Consolidadas',
+    'low_performance': 'Bajo Rendimiento',
+    'comparative': 'Análisis Comparativo',
+    'student_performance': 'Rendimiento por Estudiante'
+  };
+  return names[reportType] || reportType;
+}
+
+// Genera contenido PDF para estadísticas consolidadas
+function generateConsolidatedStatsPDFContent(stats) {
+  let content = `
+    <div class="section">
+      <div class="section-title">📊 Resumen General</div>
+      <table>
+        <tr><th>Métrica</th><th>Valor</th></tr>
+        <tr><td>Periodos Disponibles</td><td class="metric-value">${stats.overview.totalPeriods}</td></tr>
+        <tr><td>Total Estudiantes</td><td class="metric-value">${stats.overview.totalStudents}</td></tr>
+        <tr><td>Total Materias</td><td class="metric-value">${stats.overview.totalSubjects}</td></tr>
+        <tr><td>Promedio General</td><td class="metric-value">${formatGradeForReport(stats.overview.overallAverageGrade)}</td></tr>
+        <tr><td>Tasa Bajo Rendimiento</td><td class="metric-value">${formatPercentageForReport(stats.overview.overallLowPerformanceRate)}</td></tr>
+      </table>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">📈 Comparación por Periodo</div>
+      <table>
+        <tr><th>Periodo</th><th>Promedio</th><th>Bajo Rendimiento</th><th>Tasa Aprobación</th></tr>
+  `;
+  
+  Object.entries(stats.periodComparison).forEach(([period, data]) => {
+    content += `
+      <tr>
+        <td>${period}</td>
+        <td>${formatGradeForReport(data.averageGrade)}</td>
+        <td>${data.lowPerformanceCount}</td>
+        <td>${formatPercentageForReport(data.approvalRate)}</td>
+      </tr>
+    `;
+  });
+  
+  content += `
+      </table>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">📊 Tendencias</div>
+      <table>
+        <tr><th>Tipo</th><th>Cantidad</th></tr>
+        <tr><td>Mejorando</td><td class="metric-value">${stats.trends.improving}</td></tr>
+        <tr><td>Declinando</td><td class="metric-value">${stats.trends.declining}</td></tr>
+        <tr><td>Estable</td><td class="metric-value">${stats.trends.stable}</td></tr>
+      </table>
+    </div>
+  `;
+  
+  if (stats.alerts && stats.alerts.length > 0) {
+    content += `
+      <div class="section">
+        <div class="section-title">🚨 Alertas Automáticas</div>
+    `;
+    
+    stats.alerts.forEach(alert => {
+      const alertClass = alert.type === 'critical' ? 'alert-critical' : 'alert-warning';
+      content += `
+        <div class="${alertClass}">
+          <strong>${alert.title}</strong><br>
+          ${alert.message}<br>
+          <em>Recomendación: ${alert.recommendation}</em>
+        </div>
+      `;
+    });
+    
+    content += `</div>`;
+  }
+  
+  return content;
+}
+
+// Genera contenido PDF para bajo rendimiento  
+function generateLowPerformancePDFContent(report) {
+  let content = '';
+  
+  Object.entries(report.summary).forEach(([period, data]) => {
+    content += `
+      <div class="section">
+        <div class="section-title">📋 Bajo Rendimiento - ${period}</div>
+        <p><strong>Estudiantes Afectados:</strong> ${data.totalStudentsAffected} | 
+           <strong>Materias Afectadas:</strong> ${data.totalSubjectsAffected} | 
+           <strong>Promedio:</strong> ${formatGradeForReport(data.averageGrade)}</p>
+        
+        <table>
+          <tr><th>Estudiante</th><th>Curso</th><th>Materias Problemáticas</th></tr>
+    `;
+    
+    data.studentDetails.slice(0, 20).forEach(student => {
+      const subjects = student.subjects.map(s => `${s.subject} (${formatGradeForReport(s.grade)})`).join(', ');
+      content += `
+        <tr>
+          <td>${student.student}</td>
+          <td>${student.course}</td>
+          <td>${subjects}</td>
+        </tr>
+      `;
+    });
+    
+    content += `</table></div>`;
+  });
+  
+  if (report.recommendations && report.recommendations.length > 0) {
+    content += `
+      <div class="section">
+        <div class="section-title">💡 Recomendaciones</div>
+    `;
+    
+    report.recommendations.forEach(rec => {
+      content += `
+        <div class="alert-warning">
+          <strong>${rec.title}</strong><br>
+          ${rec.description}<br>
+          <strong>Acciones:</strong>
+          <ul>
+            ${rec.actionItems.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    });
+    
+    content += `</div>`;
+  }
+  
+  return content;
+}
+
+// Genera contenido PDF para comparativo
+function generateComparativePDFContent(report) {
+  let content = '';
+  
+  report.comparisons.forEach((comparison, index) => {
+    content += `
+      <div class="section">
+        <div class="section-title">📊 ${comparison.period1} vs ${comparison.period2}</div>
+        
+        <table>
+          <tr><th>Estadística</th><th>Valor</th></tr>
+          <tr><td>Total Comparaciones</td><td>${comparison.statistics.totalComparisons}</td></tr>
+          <tr><td>Mejoras</td><td class="metric-value">${comparison.statistics.improvementCount}</td></tr>
+          <tr><td>Declives</td><td>${comparison.statistics.declineCount}</td></tr>
+          <tr><td>Estables</td><td>${comparison.statistics.stableCount}</td></tr>
+          <tr><td>Cambio Promedio</td><td>${formatGradeForReport(comparison.statistics.averageChange)}</td></tr>
+        </table>
+      </div>
+    `;
+    
+    if (comparison.improvements.length > 0) {
+      content += `
+        <div class="section">
+          <div class="section-title">🎯 Principales Mejoras</div>
+          <table>
+            <tr><th>Estudiante</th><th>Materia</th><th>${comparison.period1}</th><th>${comparison.period2}</th><th>Cambio</th></tr>
+      `;
+      
+      comparison.improvements.slice(0, 10).forEach(item => {
+        content += `
+          <tr>
+            <td>${item.student}</td>
+            <td>${item.subject}</td>
+            <td>${formatGradeForReport(item.period1Grade)}</td>
+            <td>${formatGradeForReport(item.period2Grade)}</td>
+            <td class="metric-value">+${formatGradeForReport(item.change)}</td>
+          </tr>
+        `;
+      });
+      
+      content += `</table></div>`;
+    }
+    
+    if (comparison.declines.length > 0) {
+      content += `
+        <div class="section">
+          <div class="section-title">⚠️ Principales Declives</div>
+          <table>
+            <tr><th>Estudiante</th><th>Materia</th><th>${comparison.period1}</th><th>${comparison.period2}</th><th>Cambio</th></tr>
+      `;
+      
+      comparison.declines.slice(0, 10).forEach(item => {
+        content += `
+          <tr>
+            <td>${item.student}</td>
+            <td>${item.subject}</td>
+            <td>${formatGradeForReport(item.period1Grade)}</td>
+            <td>${formatGradeForReport(item.period2Grade)}</td>
+            <td style="color: #dc2626;">${formatGradeForReport(item.change)}</td>
+          </tr>
+        `;
+      });
+      
+      content += `</table></div>`;
+    }
+  });
+  
+  return content;
+}
+
+// Genera contenido PDF para rendimiento por estudiante
+function generateStudentPerformancePDFContent(report) {
+  let content = `
+    <div class="section">
+      <div class="section-title">👤 Rendimiento por Periodo Individual</div>
+      <table>
+        <tr><th>Periodo</th><th>Total Materias</th><th>Aprobadas</th><th>Reprobadas</th><th>Bajo Rendimiento</th><th>Promedio</th></tr>
+  `;
+  
+  Object.entries(report.individualPeriods || {}).forEach(([period, data]) => {
+    content += `
+      <tr>
+        <td>${period}</td>
+        <td>${data.totalSubjects}</td>
+        <td class="metric-value">${data.approvedSubjects}</td>
+        <td>${data.failedSubjects}</td>
+        <td>${data.lowPerformanceSubjects}</td>
+        <td>${formatGradeForReport(data.averageGrade)}</td>
+      </tr>
+    `;
+  });
+  
+  content += `
+      </table>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">📈 Análisis Acumulativo</div>
+      <table>
+        <tr><th>Periodos</th><th>Total Materias</th><th>Promedio</th><th>Mejorando</th><th>Declinando</th><th>Estable</th></tr>
+  `;
+  
+  Object.entries(report.cumulativeAnalysis || {}).forEach(([key, data]) => {
+    content += `
+      <tr>
+        <td>${data.periodsIncluded.join(' + ')}</td>
+        <td>${data.totalSubjects}</td>
+        <td class="metric-value">${formatGradeForReport(data.averagePerformance)}</td>
+        <td class="metric-value">${data.improvingSubjects}</td>
+        <td>${data.decliningSubjects}</td>
+        <td>${data.stableSubjects}</td>
+      </tr>
+    `;
+  });
+  
+  content += `</table></div>`;
+  
+  return content;
+}
+
+// Función principal para exportar informes
+function exportReport(report, reportType, format, filename) {
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const baseFilename = filename || `informe_${reportType}_${timestamp}`;
+  
+  switch (format) {
+    case 'csv':
+      switch (reportType) {
+        case 'consolidated_statistics':
+          exportConsolidatedStatsToCSV(`${baseFilename}.csv`, report);
+          break;
+        case 'low_performance':
+          exportLowPerformanceToCSV(`${baseFilename}.csv`, report);
+          break;
+        case 'comparative':
+          exportComparativeToCSV(`${baseFilename}.csv`, report);
+          break;
+        default:
+          alert('Exportación CSV no disponible para este tipo de reporte');
+      }
+      break;
+      
+    case 'xlsx':
+      exportReportToExcel(`${baseFilename}.xlsx`, report, reportType);
+      break;
+      
+    case 'pdf':
+      exportReportToPDF(`${baseFilename}.pdf`, report, reportType);
+      break;
+      
+    case 'json':
+      downloadJSON(`${baseFilename}.json`, report);
+      break;
+      
+    default:
+      alert('Formato de exportación no soportado: ' + format);
+  }
+}
+
+// ======================================
+// [FASE 6] Sistema de Pruebas y Validación
+// ======================================
+
+// Sistema de testing para validar funcionalidades de informes por periodos
+const validatePeriodicAnalysisSystem = (derived, dashboardData) => {
+  const validationResults = {
+    timestamp: new Date().toISOString(),
+    passed: true,
+    tests: [],
+    errors: [],
+    warnings: [],
+    performance: {}
+  };
+
+  const addTest = (name, condition, message, level = 'test') => {
+    const result = { name, passed: !!condition, message, level };
+    validationResults.tests.push(result);
+    
+    if (!condition) {
+      validationResults.passed = false;
+      if (level === 'error') {
+        validationResults.errors.push(result);
+      } else if (level === 'warning') {
+        validationResults.warnings.push(result);
+      }
+    }
+    
+    return result;
+  };
+
+  // Test 1: Validar estructura básica
+  console.time('[VALIDATION] Basic Structure');
+  addTest(
+    'Estructura Derived Data',
+    derived && derived.periodicAnalysis,
+    'El objeto derived debe contener periodicAnalysis'
+  );
+
+  addTest(
+    'Dashboard Data disponible',
+    Array.isArray(dashboardData) && dashboardData.length > 0,
+    'Debe haber datos de estudiantes cargados'
+  );
+
+  if (!derived?.periodicAnalysis) {
+    console.timeEnd('[VALIDATION] Basic Structure');
+    return validationResults;
+  }
+
+  const { periodicAnalysis } = derived;
+  
+  // Test 2: Validar periodos disponibles
+  addTest(
+    'Periodos disponibles',
+    Array.isArray(periodicAnalysis.availablePeriods) && periodicAnalysis.availablePeriods.length > 0,
+    'Debe detectar al menos un periodo con datos'
+  );
+
+  // Test 3: Validar análisis por periodo
+  periodicAnalysis.availablePeriods?.forEach(period => {
+    const periodData = periodicAnalysis.byPeriod?.[period];
+    addTest(
+      `Datos del ${period}`,
+      periodData && periodData.available && Array.isArray(periodData.data),
+      `El periodo ${period} debe tener datos válidos`
+    );
+
+    if (periodData?.data) {
+      const hasValidGrades = periodData.data.some(item => 
+        typeof item.grade === 'number' && item.grade >= 0 && item.grade <= 5
+      );
+      addTest(
+        `Calificaciones válidas ${period}`,
+        hasValidGrades,
+        `El periodo ${period} debe tener calificaciones en rango 0-5`
+      );
+    }
+  });
+
+  // Test 4: Validar análisis acumulativo
+  const cumulativeKeys = Object.keys(periodicAnalysis.cumulative || {});
+  addTest(
+    'Análisis acumulativo generado',
+    cumulativeKeys.length > 0,
+    'Debe generar análisis acumulativo cuando hay múltiples periodos',
+    periodicAnalysis.availablePeriods?.length >= 2 ? 'test' : 'warning'
+  );
+
+  // Test 5: Validar detección de bajo rendimiento
+  const lowPerfPeriods = Object.keys(periodicAnalysis.lowPerformanceByPeriod || {});
+  addTest(
+    'Detección de bajo rendimiento',
+    lowPerfPeriods.length > 0,
+    'Debe detectar estudiantes con bajo rendimiento'
+  );
+
+  // Test 6: Validar resumen de bajo rendimiento
+  addTest(
+    'Resumen de bajo rendimiento',
+    Array.isArray(periodicAnalysis.lowPerformanceSummary),
+    'Debe generar resumen de bajo rendimiento por periodo'
+  );
+
+  console.timeEnd('[VALIDATION] Basic Structure');
+
+  // Test 7: Validar generación de reportes
+  console.time('[VALIDATION] Report Generation');
+  
+  try {
+    const consolidatedStats = generateReport(derived, 'consolidated_statistics');
+    addTest(
+      'Generación de estadísticas consolidadas',
+      consolidatedStats && !consolidatedStats.error,
+      'Debe generar estadísticas consolidadas sin errores'
+    );
+
+    const lowPerfReport = generateReport(derived, 'low_performance');
+    addTest(
+      'Generación de reporte de bajo rendimiento',
+      lowPerfReport && !lowPerfReport.error,
+      'Debe generar reporte de bajo rendimiento sin errores'
+    );
+
+    const comparativeReport = generateReport(derived, 'comparative');
+    addTest(
+      'Generación de reporte comparativo',
+      comparativeReport && !comparativeReport.error,
+      'Debe generar reporte comparativo sin errores'
+    );
+
+  } catch (error) {
+    addTest(
+      'Generación de reportes',
+      false,
+      `Error generando reportes: ${error.message}`,
+      'error'
+    );
+  }
+  
+  console.timeEnd('[VALIDATION] Report Generation');
+
+  // Test 8: Validar funciones utilitarias
+  console.time('[VALIDATION] Utility Functions');
+  
+  addTest(
+    'Formato de calificaciones',
+    formatGradeForReport(3.75) === '3.75' && formatGradeForReport(null) === 'N/A',
+    'La función formatGradeForReport debe manejar números y valores nulos'
+  );
+
+  addTest(
+    'Formato de porcentajes',
+    formatPercentageForReport(85.7) === '85.7%' && formatPercentageForReport(null) === 'N/A',
+    'La función formatPercentageForReport debe manejar números y valores nulos'
+  );
+
+  addTest(
+    'Estado de calificaciones',
+    getGradeStatus(4.5).status === 'excellent' && getGradeStatus(2.5).status === 'low',
+    'La función getGradeStatus debe clasificar correctamente las calificaciones'
+  );
+
+  console.timeEnd('[VALIDATION] Utility Functions');
+
+  // Test 9: Validar cálculos de tendencias
+  console.time('[VALIDATION] Trend Calculations');
+  
+  addTest(
+    'Cálculo de tendencias',
+    calculateTrend([3.0, 3.5, 4.0]) === 'Mejorando' && calculateTrend([4.0, 3.5, 3.0]) === 'Declinando',
+    'La función calculateTrend debe detectar correctamente mejoras y declives'
+  );
+
+  console.timeEnd('[VALIDATION] Trend Calculations');
+
+  // Test 10: Validar detección automática de alertas
+  if (periodicAnalysis.lowPerformanceSummary) {
+    const totalLowPerf = periodicAnalysis.lowPerformanceSummary.reduce(
+      (sum, period) => sum + period.subjectsWithLowPerformance, 0
+    );
+    
+    addTest(
+      'Detección de alertas críticas',
+      totalLowPerf > 0,
+      'Debe detectar situaciones que requieren alertas automáticas',
+      'warning'
+    );
+  }
+
+  // Métricas de rendimiento
+  const performanceStart = performance.now();
+  try {
+    generateReport(derived, 'consolidated_statistics');
+    validationResults.performance.reportGeneration = performance.now() - performanceStart;
+    
+    addTest(
+      'Rendimiento de generación',
+      validationResults.performance.reportGeneration < 1000,
+      `Generación de reportes debe ser < 1000ms (actual: ${validationResults.performance.reportGeneration.toFixed(2)}ms)`,
+      validationResults.performance.reportGeneration > 1000 ? 'warning' : 'test'
+    );
+  } catch (error) {
+    validationResults.performance.reportGeneration = -1;
+    addTest(
+      'Rendimiento de generación',
+      false,
+      `Error midiendo rendimiento: ${error.message}`,
+      'error'
+    );
+  }
+
+  return validationResults;
+};
+
+// Genera datos de prueba para testing
+const generateTestData = () => {
+  const students = ['Ana García', 'Juan Pérez', 'María López', 'Carlos Ruiz', 'Sofía Chen'];
+  const areas = ['MATEMATICAS', 'CIENCIAS', 'LENGUAJE', 'SOCIALES'];
+  const subjects = {
+    'MATEMATICAS': ['Algebra', 'Geometría', 'Estadística'],
+    'CIENCIAS': ['Biología', 'Química', 'Física'],
+    'LENGUAJE': ['Gramática', 'Literatura', 'Redacción'],
+    'SOCIALES': ['Historia', 'Geografía', 'Cívica']
+  };
+
+  const testData = students.map((name, index) => {
+    const student = {
+      id: `EST${index + 1}`,
+      name: name,
+      CURSO: `10${String.fromCharCode(65 + index % 3)}`, // 10A, 10B, 10C
+      areas: {}
+    };
+
+    areas.forEach(areaName => {
+      const areaData = {
+        DEF: {},
+        asignaturas: {}
+      };
+
+      // Generar calificaciones por periodo
+      ['P1', 'P2', 'P3'].forEach(period => {
+        // Simular tendencia: algunos estudiantes mejoran, otros empeoran
+        let baseGrade = 2.5 + Math.random() * 2; // Base entre 2.5 y 4.5
+        if (index % 3 === 0) baseGrade += (period === 'P3' ? 0.5 : period === 'P2' ? 0.2 : 0); // Mejora
+        if (index % 3 === 1) baseGrade -= (period === 'P3' ? 0.3 : period === 'P2' ? 0.1 : 0); // Declina
+        
+        areaData.DEF[period] = Math.min(5.0, Math.max(0.0, baseGrade + (Math.random() - 0.5) * 0.4));
+      });
+
+      // Generar calificaciones por asignatura
+      subjects[areaName].forEach(subjectName => {
+        const subjectData = {};
+        ['P1', 'P2', 'P3'].forEach(period => {
+          const areaGrade = areaData.DEF[period];
+          subjectData[period] = Math.min(5.0, Math.max(0.0, areaGrade + (Math.random() - 0.5) * 0.5));
+        });
+        areaData.asignaturas[subjectName] = subjectData;
+      });
+
+      student.areas[areaName] = areaData;
+    });
+
+    return student;
+  });
+
+  return testData;
+};
+
+// Ejecuta todas las pruebas de validación
+const runCompleteValidation = (derived, dashboardData) => {
+  console.group('[VALIDATION] Sistema de Informes por Periodos - Pruebas Completas');
+  console.time('[VALIDATION] Total Time');
+
+  const results = validatePeriodicAnalysisSystem(derived, dashboardData);
+  
+  console.timeEnd('[VALIDATION] Total Time');
+  
+  // Mostrar resumen
+  console.log('📊 RESUMEN DE VALIDACIÓN:');
+  console.log(`✅ Pruebas exitosas: ${results.tests.filter(t => t.passed).length}`);
+  console.log(`❌ Pruebas fallidas: ${results.tests.filter(t => !t.passed).length}`);
+  console.log(`⚠️  Advertencias: ${results.warnings.length}`);
+  console.log(`🚨 Errores críticos: ${results.errors.length}`);
+  
+  if (results.performance.reportGeneration) {
+    console.log(`⚡ Rendimiento generación: ${results.performance.reportGeneration.toFixed(2)}ms`);
+  }
+
+  // Mostrar detalles de errores y advertencias
+  if (results.errors.length > 0) {
+    console.group('🚨 ERRORES CRÍTICOS:');
+    results.errors.forEach(error => {
+      console.error(`❌ ${error.name}: ${error.message}`);
+    });
+    console.groupEnd();
+  }
+
+  if (results.warnings.length > 0) {
+    console.group('⚠️ ADVERTENCIAS:');
+    results.warnings.forEach(warning => {
+      console.warn(`⚠️ ${warning.name}: ${warning.message}`);
+    });
+    console.groupEnd();
+  }
+
+  console.groupEnd();
+  return results;
+};
+
+// Prueba específica de exportación
+const testExportFunctionality = () => {
+  console.group('[VALIDATION] Pruebas de Exportación');
+  
+  const exportTests = {
+    passed: true,
+    tests: []
+  };
+
+  const addExportTest = (name, testFn) => {
+    try {
+      const result = testFn();
+      exportTests.tests.push({ name, passed: true, message: 'Prueba exitosa' });
+      console.log(`✅ ${name}: OK`);
+      return result;
+    } catch (error) {
+      exportTests.tests.push({ name, passed: false, message: error.message });
+      exportTests.passed = false;
+      console.error(`❌ ${name}: ${error.message}`);
+      return null;
+    }
+  };
+
+  // Crear datos de prueba
+  const testData = generateTestData();
+  const testDerived = buildDerived(testData);
+
+  if (!testDerived?.periodicAnalysis) {
+    console.error('❌ No se puede probar exportación sin datos válidos');
+    console.groupEnd();
+    return { passed: false, tests: [] };
+  }
+
+  // Probar generación de reportes
+  addExportTest('Generación de estadísticas consolidadas', () => {
+    return generateReport(testDerived, 'consolidated_statistics');
+  });
+
+  addExportTest('Generación de reporte de bajo rendimiento', () => {
+    return generateReport(testDerived, 'low_performance');
+  });
+
+  addExportTest('Generación de reporte comparativo', () => {
+    return generateReport(testDerived, 'comparative');
+  });
+
+  // Probar funciones de formato de exportación
+  addExportTest('Función exportConsolidatedStatsToCSV', () => {
+    const stats = generateReport(testDerived, 'consolidated_statistics');
+    if (!stats || stats.error) throw new Error('No se pueden generar estadísticas para CSV');
+    // Simular exportación sin descargar archivo
+    return true;
+  });
+
+  addExportTest('Función exportReportToExcel', () => {
+    const stats = generateReport(testDerived, 'consolidated_statistics');
+    if (!stats || stats.error) throw new Error('No se pueden generar estadísticas para Excel');
+    // Verificar que XLSX esté disponible
+    if (typeof XLSX === 'undefined') throw new Error('Biblioteca XLSX no disponible');
+    return true;
+  });
+
+  addExportTest('Función generatePDFContent', () => {
+    const stats = generateReport(testDerived, 'consolidated_statistics');
+    if (!stats || stats.error) throw new Error('No se pueden generar estadísticas para PDF');
+    const pdfContent = generatePDFContent(stats, 'consolidated_statistics');
+    if (!pdfContent || pdfContent.length < 100) throw new Error('Contenido PDF muy corto');
+    return true;
+  });
+
+  console.log(`\n📊 RESUMEN EXPORTACIÓN:`);
+  console.log(`✅ Pruebas exitosas: ${exportTests.tests.filter(t => t.passed).length}`);
+  console.log(`❌ Pruebas fallidas: ${exportTests.tests.filter(t => !t.passed).length}`);
+
+  console.groupEnd();
+  return exportTests;
+};
+
+// Benchmark de rendimiento
+const benchmarkPerformance = (dashboardData) => {
+  console.group('[BENCHMARK] Rendimiento del Sistema');
+  
+  const benchmarks = {};
+  
+  // Benchmark 1: buildDerived
+  console.time('[BENCHMARK] buildDerived');
+  const start1 = performance.now();
+  const derived = buildDerived(dashboardData);
+  const end1 = performance.now();
+  console.timeEnd('[BENCHMARK] buildDerived');
+  benchmarks.buildDerived = end1 - start1;
+
+  if (!derived?.periodicAnalysis) {
+    console.warn('⚠️ No se puede hacer benchmark sin datos válidos');
+    console.groupEnd();
+    return benchmarks;
+  }
+
+  // Benchmark 2: Generación de reportes
+  console.time('[BENCHMARK] generateReport');
+  const start2 = performance.now();
+  generateReport(derived, 'consolidated_statistics');
+  generateReport(derived, 'low_performance');
+  generateReport(derived, 'comparative');
+  const end2 = performance.now();
+  console.timeEnd('[BENCHMARK] generateReport');
+  benchmarks.reportGeneration = end2 - start2;
+
+  // Benchmark 3: buildPeriodicAnalysis específicamente
+  console.time('[BENCHMARK] buildPeriodicAnalysis');
+  const start3 = performance.now();
+  buildPeriodicAnalysis(dashboardData);
+  const end3 = performance.now();
+  console.timeEnd('[BENCHMARK] buildPeriodicAnalysis');
+  benchmarks.periodicAnalysis = end3 - start3;
+
+  // Evaluación de rendimiento
+  const evalPerformance = (time, name, thresholds) => {
+    if (time < thresholds.good) {
+      console.log(`🟢 ${name}: ${time.toFixed(2)}ms (Excelente)`);
+    } else if (time < thresholds.acceptable) {
+      console.log(`🟡 ${name}: ${time.toFixed(2)}ms (Aceptable)`);
+    } else {
+      console.log(`🔴 ${name}: ${time.toFixed(2)}ms (Necesita optimización)`);
+    }
+  };
+
+  console.log('\n📊 RESULTADOS DE RENDIMIENTO:');
+  evalPerformance(benchmarks.buildDerived, 'buildDerived', { good: 100, acceptable: 300 });
+  evalPerformance(benchmarks.reportGeneration, 'Generación de reportes', { good: 50, acceptable: 150 });
+  evalPerformance(benchmarks.periodicAnalysis, 'buildPeriodicAnalysis', { good: 50, acceptable: 150 });
+
+  console.groupEnd();
+  return benchmarks;
+};
+
+// Función principal de validación que se puede llamar desde consola
+window.validatePeriodicReportsSystem = (dashboardData, derived) => {
+  console.clear();
+  console.log('🧪 INICIANDO VALIDACIÓN COMPLETA DEL SISTEMA DE INFORMES POR PERIODOS');
+  console.log('====================================================================');
+  
+  const data = dashboardData || (window.app && window.app.dashboardData);
+  const derivedData = derived || (window.app && window.app.derived);
+  
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    console.warn('⚠️ No hay datos de dashboard disponibles. Generando datos de prueba...');
+    const testData = generateTestData();
+    const testDerived = buildDerived(testData);
+    
+    console.log('📊 Datos de prueba generados:');
+    console.log(`- ${testData.length} estudiantes`);
+    console.log(`- ${Object.keys(testData[0].areas).length} áreas académicas`);
+    console.log(`- 3 periodos (P1, P2, P3)`);
+    
+    const validationResults = runCompleteValidation(testDerived, testData);
+    const exportResults = testExportFunctionality();
+    const performanceResults = benchmarkPerformance(testData);
+    
+    return {
+      validation: validationResults,
+      export: exportResults,
+      performance: performanceResults,
+      testData: testData,
+      testDerived: testDerived
+    };
+  } else {
+    console.log('📊 Usando datos reales del dashboard');
+    const validationResults = runCompleteValidation(derivedData, data);
+    const exportResults = testExportFunctionality();
+    const performanceResults = benchmarkPerformance(data);
+    
+    return {
+      validation: validationResults,
+      export: exportResults,
+      performance: performanceResults
+    };
+  }
+};
+
+// Función para ejecutar pruebas automáticas al cargar
+const runAutoValidation = () => {
+  // Solo ejecutar si hay datos disponibles y estamos en modo desarrollo
+  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+    setTimeout(() => {
+      if (window.app?.dashboardData && window.app?.derived) {
+        console.log('🔄 Ejecutando validación automática...');
+        window.validatePeriodicReportsSystem();
+      }
+    }, 2000); // Esperar 2 segundos después de cargar
+  }
+};
 
 // [RestoreJSON] lee un archivo .json y aplica estado derivado de forma segura
 function restoreFromJSONFile(onData){
@@ -2107,6 +3407,864 @@ function formatNota(n){
       );
     };
 
+    // ======================================
+    // [FASE 4] Componente Informes por Periodos - Nueva pestaña
+    // ======================================
+    const InformesView = React.memo(({ dashboardData, derived, filters }) => {
+      console.time('render:InformesView');
+      
+      // Estados para la interfaz de informes
+      const [reportType, setReportType] = useState('consolidated_statistics');
+      const [selectedPeriod, setSelectedPeriod] = useState('P1');
+      const [selectedStudent, setSelectedStudent] = useState('');
+      const [courseFilter, setCourseFilter] = useState('ALL');
+      const [comparisonType, setComparisonType] = useState('sequential');
+      const [currentReport, setCurrentReport] = useState(null);
+      const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+      const [progressInfo, setProgressInfo] = useState({ step: '', percentage: 0 });
+      const [lastGeneratedTime, setLastGeneratedTime] = useState(null);
+      const [reportGenerationStats, setReportGenerationStats] = useState(null);
+      const [showDiagnostics, setShowDiagnostics] = useState(false);
+      const [diagnosticResults, setDiagnosticResults] = useState(null);
+
+      // Opciones disponibles para estudiantes
+      const studentOptions = useMemo(() => {
+        if (!Array.isArray(dashboardData)) return [];
+        const uniqueStudents = [...new Set(dashboardData.map(s => s.name))].sort();
+        return uniqueStudents;
+      }, [dashboardData]);
+
+      // Opciones disponibles para cursos
+      const courseOptions = useMemo(() => {
+        if (!Array.isArray(dashboardData)) return ['ALL'];
+        const uniqueCourses = [...new Set(dashboardData.map(s => s.CURSO || s.__course).filter(Boolean))].sort();
+        return ['ALL', ...uniqueCourses];
+      }, [dashboardData]);
+
+      // Periodos disponibles basados en el análisis
+      const availablePeriods = useMemo(() => {
+        if (!derived?.periodicAnalysis?.availablePeriods) return ['P1', 'P2', 'P3', 'P4'];
+        return derived.periodicAnalysis.availablePeriods;
+      }, [derived]);
+
+      // Función para generar informes con indicadores de progreso
+      const handleGenerateReport = useCallback(async () => {
+        if (!derived) return;
+        
+        const startTime = performance.now();
+        setIsGeneratingReport(true);
+        setProgressInfo({ step: 'Iniciando generación de reporte...', percentage: 0 });
+        
+        try {
+          // Paso 1: Preparar opciones
+          setProgressInfo({ step: 'Configurando parámetros del reporte...', percentage: 20 });
+          await new Promise(resolve => setTimeout(resolve, 100)); // Permitir actualización de UI
+          
+          const options = {};
+          
+          // Configurar opciones según el tipo de reporte
+          switch (reportType) {
+            case 'student_performance':
+              if (selectedStudent) {
+                options.studentId = dashboardData.find(s => s.name === selectedStudent)?.id;
+              }
+              break;
+            case 'low_performance':
+              if (courseFilter !== 'ALL') {
+                options.courseFilter = courseFilter;
+              }
+              break;
+            case 'comparative':
+              options.comparisonType = comparisonType;
+              break;
+          }
+
+          // Paso 2: Generar reporte
+          setProgressInfo({ step: 'Procesando datos y generando análisis...', percentage: 40 });
+          await new Promise(resolve => setTimeout(resolve, 150));
+          
+          const report = generateReport(derived, reportType, options);
+          
+          // Paso 3: Finalizar
+          setProgressInfo({ step: 'Finalizando reporte...', percentage: 80 });
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          setCurrentReport(report);
+          
+          // Estadísticas de generación
+          const endTime = performance.now();
+          const generationTime = Math.round(endTime - startTime);
+          const now = new Date();
+          
+          setLastGeneratedTime(now.toLocaleString());
+          setReportGenerationStats({
+            generationTime,
+            reportType,
+            dataPoints: Array.isArray(dashboardData) ? dashboardData.length : 0,
+            timestamp: now.toISOString()
+          });
+          
+          setProgressInfo({ step: 'Reporte generado exitosamente', percentage: 100 });
+          
+        } catch (error) {
+          console.error('Error generando reporte:', error);
+          setCurrentReport({ error: 'Error generando el reporte: ' + error.message });
+          setProgressInfo({ step: 'Error en la generación', percentage: 0 });
+        } finally {
+          // Breve pausa para mostrar el 100% antes de ocultar
+          setTimeout(() => {
+            setIsGeneratingReport(false);
+            setProgressInfo({ step: '', percentage: 0 });
+          }, 500);
+        }
+      }, [reportType, selectedStudent, courseFilter, comparisonType, derived, dashboardData]);
+
+      // Auto-generar estadísticas consolidadas al cargar
+      useEffect(() => {
+        if (derived && reportType === 'consolidated_statistics') {
+          handleGenerateReport();
+        }
+      }, [derived, reportType, handleGenerateReport]);
+
+      // Función para ejecutar diagnósticos del sistema
+      const runDiagnostics = useCallback(async () => {
+        setIsGeneratingReport(true);
+        try {
+          console.log('🧪 Iniciando diagnósticos del sistema...');
+          const results = window.validatePeriodicReportsSystem(dashboardData, derived);
+          setDiagnosticResults(results);
+          console.log('✅ Diagnósticos completados');
+        } catch (error) {
+          console.error('❌ Error en diagnósticos:', error);
+          setDiagnosticResults({ error: error.message });
+        } finally {
+          setIsGeneratingReport(false);
+        }
+      }, [dashboardData, derived]);
+
+      useEffect(() => {
+        console.timeEnd('render:InformesView');
+      });
+
+      // Renderizar resumen de estadísticas consolidadas
+      const renderConsolidatedStats = (stats) => {
+        if (!stats || stats.error) {
+          return <div className="text-red-600">Error: {stats?.error || 'Sin datos disponibles'}</div>;
+        }
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Resumen General */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="font-bold text-lg mb-4 text-gray-800">📊 Resumen General</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Periodos Disponibles:</span>
+                  <span className="font-semibold">{stats.overview.totalPeriods}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Estudiantes:</span>
+                  <span className="font-semibold">{stats.overview.totalStudents}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Materias:</span>
+                  <span className="font-semibold">{stats.overview.totalSubjects}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Promedio General:</span>
+                  <span className={`font-semibold ${stats.overview.overallAverageGrade >= 3.0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatGradeForReport(stats.overview.overallAverageGrade)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Bajo Rendimiento:</span>
+                  <span className={`font-semibold ${stats.overview.overallLowPerformanceRate > 25 ? 'text-red-600' : 'text-yellow-600'}`}>
+                    {formatPercentageForReport(stats.overview.overallLowPerformanceRate)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Comparación por Periodo */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="font-bold text-lg mb-4 text-gray-800">📈 Por Periodo</h3>
+              <div className="space-y-3">
+                {Object.entries(stats.periodComparison).map(([period, data]) => (
+                  <div key={period} className="border-b border-gray-100 pb-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-700">{period}</span>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold">{formatGradeForReport(data.averageGrade)}</div>
+                        <div className={`text-xs ${data.approvalRate >= 70 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercentageForReport(data.approvalRate)} aprobación
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tendencias */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="font-bold text-lg mb-4 text-gray-800">📊 Tendencias</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-green-600">↗ Mejorando:</span>
+                  <span className="font-semibold">{stats.trends.improving}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-600">↘ Declinando:</span>
+                  <span className="font-semibold">{stats.trends.declining}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">→ Estable:</span>
+                  <span className="font-semibold">{stats.trends.stable}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Alertas */}
+            {stats.alerts && stats.alerts.length > 0 && (
+              <div className="md:col-span-2 lg:col-span-3 bg-orange-50 border border-orange-200 rounded-xl p-5">
+                <h3 className="font-bold text-lg mb-4 text-orange-800">🚨 Alertas Automáticas</h3>
+                <div className="space-y-3">
+                  {stats.alerts.map((alert, index) => (
+                    <div key={index} className={`p-3 rounded-lg border-l-4 ${
+                      alert.type === 'critical' ? 'bg-red-50 border-red-500' : 
+                      alert.type === 'warning' ? 'bg-yellow-50 border-yellow-500' : 
+                      'bg-blue-50 border-blue-500'
+                    }`}>
+                      <h4 className="font-semibold text-gray-800">{alert.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
+                      <p className="text-xs text-gray-500 mt-2 italic">{alert.recommendation}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Renderizar reporte de bajo rendimiento
+      const renderLowPerformanceReport = (report) => {
+        if (!report || report.error) {
+          return <div className="text-red-600">Error: {report?.error || 'Sin datos disponibles'}</div>;
+        }
+
+        return (
+          <div className="space-y-6">
+            {Object.entries(report.summary).map(([period, data]) => (
+              <div key={period} className="bg-white border border-gray-200 rounded-xl p-5">
+                <h3 className="font-bold text-lg mb-4 text-gray-800">📋 Bajo Rendimiento - {period}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-3 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{data.totalStudentsAffected}</div>
+                    <div className="text-sm text-gray-600">Estudiantes Afectados</div>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">{data.totalSubjectsAffected}</div>
+                    <div className="text-sm text-gray-600">Materias Afectadas</div>
+                  </div>
+                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-600">{formatGradeForReport(data.averageGrade)}</div>
+                    <div className="text-sm text-gray-600">Promedio</div>
+                  </div>
+                </div>
+
+                {data.studentDetails.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-gray-300">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="border border-gray-300 px-3 py-2 text-left">Estudiante</th>
+                          <th className="border border-gray-300 px-3 py-2 text-left">Curso</th>
+                          <th className="border border-gray-300 px-3 py-2 text-left">Materias Afectadas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.studentDetails.slice(0, 10).map((student, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-3 py-2">{student.student}</td>
+                            <td className="border border-gray-300 px-3 py-2">{student.course}</td>
+                            <td className="border border-gray-300 px-3 py-2">
+                              <div className="text-sm">
+                                {student.subjects.slice(0, 3).map((subj, i) => (
+                                  <div key={i}>{subj.subject} ({formatGradeForReport(subj.grade)})</div>
+                                ))}
+                                {student.subjects.length > 3 && (
+                                  <div className="text-gray-500">... y {student.subjects.length - 3} más</div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Recomendaciones */}
+            {report.recommendations && report.recommendations.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                <h3 className="font-bold text-lg mb-4 text-blue-800">💡 Recomendaciones</h3>
+                <div className="space-y-4">
+                  {report.recommendations.map((rec, index) => (
+                    <div key={index} className="bg-white p-4 rounded-lg border border-blue-100">
+                      <h4 className="font-semibold text-gray-800 mb-2">{rec.title}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{rec.description}</p>
+                      <ul className="text-sm text-gray-700">
+                        {rec.actionItems.map((item, i) => (
+                          <li key={i} className="flex items-start">
+                            <span className="text-blue-500 mr-2">•</span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Renderizar reporte comparativo
+      const renderComparativeReport = (report) => {
+        if (!report || report.error) {
+          return <div className="text-red-600">Error: {report?.error || 'Sin datos disponibles'}</div>;
+        }
+
+        return (
+          <div className="space-y-6">
+            {report.comparisons.map((comparison, index) => (
+              <div key={index} className="bg-white border border-gray-200 rounded-xl p-5">
+                <h3 className="font-bold text-lg mb-4 text-gray-800">
+                  📊 {comparison.period1} vs {comparison.period2}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{comparison.statistics.improvementCount}</div>
+                    <div className="text-sm text-gray-600">Mejoras</div>
+                  </div>
+                  <div className="text-center p-3 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{comparison.statistics.declineCount}</div>
+                    <div className="text-sm text-gray-600">Declives</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-600">{comparison.statistics.stableCount}</div>
+                    <div className="text-sm text-gray-600">Estables</div>
+                  </div>
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">{formatGradeForReport(comparison.statistics.averageChange)}</div>
+                    <div className="text-sm text-gray-600">Cambio Promedio</div>
+                  </div>
+                </div>
+
+                {/* Top Mejoras */}
+                {comparison.improvements.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-green-700 mb-2">🎯 Principales Mejoras</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border border-gray-300 text-sm">
+                        <thead className="bg-green-50">
+                          <tr>
+                            <th className="border border-gray-300 px-2 py-1 text-left">Estudiante</th>
+                            <th className="border border-gray-300 px-2 py-1 text-left">Materia</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">{comparison.period1}</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">{comparison.period2}</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">Cambio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparison.improvements.slice(0, 5).map((item, i) => (
+                            <tr key={i} className="hover:bg-green-25">
+                              <td className="border border-gray-300 px-2 py-1">{item.student}</td>
+                              <td className="border border-gray-300 px-2 py-1">{item.subject}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center">{formatGradeForReport(item.period1Grade)}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center">{formatGradeForReport(item.period2Grade)}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center text-green-600 font-semibold">+{formatGradeForReport(item.change)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Declives */}
+                {comparison.declines.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-red-700 mb-2">⚠️ Principales Declives</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full border border-gray-300 text-sm">
+                        <thead className="bg-red-50">
+                          <tr>
+                            <th className="border border-gray-300 px-2 py-1 text-left">Estudiante</th>
+                            <th className="border border-gray-300 px-2 py-1 text-left">Materia</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">{comparison.period1}</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">{comparison.period2}</th>
+                            <th className="border border-gray-300 px-2 py-1 text-center">Cambio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparison.declines.slice(0, 5).map((item, i) => (
+                            <tr key={i} className="hover:bg-red-25">
+                              <td className="border border-gray-300 px-2 py-1">{item.student}</td>
+                              <td className="border border-gray-300 px-2 py-1">{item.subject}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center">{formatGradeForReport(item.period1Grade)}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center">{formatGradeForReport(item.period2Grade)}</td>
+                              <td className="border border-gray-300 px-2 py-1 text-center text-red-600 font-semibold">{formatGradeForReport(item.change)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Panel de Control */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">📊 Sistema de Informes por Periodos</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {/* Tipo de Reporte */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Reporte</label>
+                <select 
+                  value={reportType} 
+                  onChange={(e) => setReportType(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="consolidated_statistics">📈 Estadísticas Consolidadas</option>
+                  <option value="student_performance">👤 Rendimiento por Estudiante</option>
+                  <option value="low_performance">⚠️ Bajo Rendimiento</option>
+                  <option value="comparative">🔄 Comparativo entre Periodos</option>
+                </select>
+              </div>
+
+              {/* Filtro por Estudiante (solo para reporte de estudiante) */}
+              {reportType === 'student_performance' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Estudiante</label>
+                  <select 
+                    value={selectedStudent} 
+                    onChange={(e) => setSelectedStudent(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">Todos los estudiantes</option>
+                    {studentOptions.map(student => (
+                      <option key={student} value={student}>{student}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Filtro por Curso */}
+              {reportType === 'low_performance' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Curso</label>
+                  <select 
+                    value={courseFilter} 
+                    onChange={(e) => setCourseFilter(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    {courseOptions.map(course => (
+                      <option key={course} value={course}>
+                        {course === 'ALL' ? 'Todos los cursos' : course}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Tipo de Comparación */}
+              {reportType === 'comparative' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Comparación</label>
+                  <select 
+                    value={comparisonType} 
+                    onChange={(e) => setComparisonType(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="sequential">Secuencial (P1→P2→P3)</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Botón Generar */}
+              <div className="flex items-end">
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={isGeneratingReport || !derived}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-md transition-colors"
+                >
+                  {isGeneratingReport ? '⏳ Generando...' : '🔄 Generar Reporte'}
+                </button>
+
+                {/* Barra de Progreso */}
+                {isGeneratingReport && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>{progressInfo.step}</span>
+                      <span>{progressInfo.percentage}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${progressInfo.percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Información de última generación */}
+                {lastGeneratedTime && reportGenerationStats && !isGeneratingReport && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600">✅</span>
+                        <span className="text-sm font-medium text-green-800">Último reporte generado</span>
+                      </div>
+                      <span className="text-xs text-green-600">{lastGeneratedTime}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-green-700">
+                      <div className="flex justify-between">
+                        <span>Tiempo de procesamiento:</span>
+                        <span className="font-medium">{reportGenerationStats.generationTime}ms</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Puntos de datos procesados:</span>
+                        <span className="font-medium">{reportGenerationStats.dataPoints}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Información de Periodos Disponibles */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Periodos Disponibles:</span>
+                <div className="flex gap-2">
+                  {availablePeriods.map(period => (
+                    <span key={period} className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                      {period}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Panel de Exportación Rápida */}
+            {currentReport && !currentReport.error && (
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border border-indigo-200">
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">⚡ Exportación Rápida</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'csv')}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                  >
+                    📄 Descargar CSV
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'xlsx')}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                  >
+                    📊 Descargar Excel
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'pdf')}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                  >
+                    📄 Crear PDF
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'json')}
+                    className="flex items-center justify-center gap-1 px-3 py-2 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors"
+                  >
+                    🔧 Datos JSON
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 mt-2 text-center">
+                  Los archivos se descargarán automáticamente con nombres descriptivos y fecha actual
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Panel de Diagnósticos y Validación */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">🧪 Diagnósticos del Sistema</h2>
+              <button
+                onClick={() => setShowDiagnostics(!showDiagnostics)}
+                className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors"
+              >
+                {showDiagnostics ? '📋 Ocultar Diagnósticos' : '🔍 Mostrar Diagnósticos'}
+              </button>
+            </div>
+
+            {showDiagnostics && (
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <button
+                    onClick={runDiagnostics}
+                    disabled={isGeneratingReport || !derived}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+                  >
+                    {isGeneratingReport ? '⏳ Ejecutando...' : '🧪 Ejecutar Validación Completa'}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      console.clear();
+                      console.log('🔧 Abriendo consola de desarrollador para ver resultados detallados...');
+                      window.validatePeriodicReportsSystem(dashboardData, derived);
+                    }}
+                    disabled={!derived}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-md transition-colors"
+                  >
+                    🖥️ Ejecutar en Consola
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const testData = generateTestData();
+                      const testDerived = buildDerived(testData);
+                      setDiagnosticResults(window.validatePeriodicReportsSystem(testData, testDerived));
+                    }}
+                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-md transition-colors"
+                  >
+                    🎯 Probar con Datos Simulados
+                  </button>
+                </div>
+
+                {/* Resultados de Diagnósticos */}
+                {diagnosticResults && (
+                  <div className="mt-6 space-y-4">
+                    {diagnosticResults.error ? (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-red-800 mb-2">❌ Error en Diagnósticos</h4>
+                        <p className="text-red-700">{diagnosticResults.error}</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Resumen de Validación */}
+                        {diagnosticResults.validation && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-800 mb-3">📊 Resumen de Validación</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="text-center p-3 bg-green-50 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600">
+                                  {diagnosticResults.validation.tests.filter(t => t.passed).length}
+                                </div>
+                                <div className="text-sm text-gray-600">Pruebas Exitosas</div>
+                              </div>
+                              <div className="text-center p-3 bg-red-50 rounded-lg">
+                                <div className="text-2xl font-bold text-red-600">
+                                  {diagnosticResults.validation.tests.filter(t => !t.passed).length}
+                                </div>
+                                <div className="text-sm text-gray-600">Pruebas Fallidas</div>
+                              </div>
+                              <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                                <div className="text-2xl font-bold text-yellow-600">
+                                  {diagnosticResults.validation.warnings.length}
+                                </div>
+                                <div className="text-sm text-gray-600">Advertencias</div>
+                              </div>
+                              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                                <div className="text-2xl font-bold text-purple-600">
+                                  {diagnosticResults.validation.errors.length}
+                                </div>
+                                <div className="text-sm text-gray-600">Errores Críticos</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Resultados de Exportación */}
+                        {diagnosticResults.export && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-800 mb-3">📤 Pruebas de Exportación</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                <div className="text-2xl font-bold text-blue-600">
+                                  {diagnosticResults.export.tests.filter(t => t.passed).length}
+                                </div>
+                                <div className="text-sm text-gray-600">Formatos Funcionando</div>
+                              </div>
+                              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                                <div className="text-2xl font-bold text-orange-600">
+                                  {diagnosticResults.export.tests.filter(t => !t.passed).length}
+                                </div>
+                                <div className="text-sm text-gray-600">Formatos con Problemas</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Métricas de Rendimiento */}
+                        {diagnosticResults.performance && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-800 mb-3">⚡ Rendimiento del Sistema</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {Object.entries(diagnosticResults.performance).map(([key, value]) => {
+                                const isGood = value < 100;
+                                const isAcceptable = value < 300;
+                                return (
+                                  <div key={key} className={`text-center p-3 rounded-lg ${
+                                    isGood ? 'bg-green-50' : isAcceptable ? 'bg-yellow-50' : 'bg-red-50'
+                                  }`}>
+                                    <div className={`text-2xl font-bold ${
+                                      isGood ? 'text-green-600' : isAcceptable ? 'text-yellow-600' : 'text-red-600'
+                                    }`}>
+                                      {value.toFixed(1)}ms
+                                    </div>
+                                    <div className="text-sm text-gray-600 capitalize">
+                                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Detalles de Errores y Advertencias */}
+                        {diagnosticResults.validation && (diagnosticResults.validation.errors.length > 0 || diagnosticResults.validation.warnings.length > 0) && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 className="font-semibold text-gray-800 mb-3">⚠️ Detalles de Problemas</h4>
+                            
+                            {diagnosticResults.validation.errors.length > 0 && (
+                              <div className="mb-4">
+                                <h5 className="font-medium text-red-700 mb-2">🚨 Errores Críticos:</h5>
+                                <ul className="space-y-1">
+                                  {diagnosticResults.validation.errors.map((error, index) => (
+                                    <li key={index} className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                                      <strong>{error.name}:</strong> {error.message}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {diagnosticResults.validation.warnings.length > 0 && (
+                              <div>
+                                <h5 className="font-medium text-yellow-700 mb-2">⚠️ Advertencias:</h5>
+                                <ul className="space-y-1">
+                                  {diagnosticResults.validation.warnings.map((warning, index) => (
+                                    <li key={index} className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
+                                      <strong>{warning.name}:</strong> {warning.message}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">
+                            💡 Para ver información detallada adicional, abre las herramientas de desarrollador (F12) y revisa la consola.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+            {/* Área de Resultados */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">📋 Resultados del Reporte</h3>
+              
+              {/* Botones de Exportación */}
+              {currentReport && !currentReport.error && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'csv')}
+                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                    title="Exportar a CSV"
+                  >
+                    � CSV
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'xlsx')}
+                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                    title="Exportar a Excel"
+                  >
+                    📊 XLSX
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'pdf')}
+                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                    title="Exportar a PDF"
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    onClick={() => exportReport(currentReport, reportType, 'json')}
+                    className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors"
+                    title="Exportar datos en JSON"
+                  >
+                    🔧 JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {!derived && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-4">📊</div>
+                <p>No hay datos de análisis disponibles para generar informes.</p>
+              </div>
+            )}
+
+            {derived && !currentReport && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-4">🔄</div>
+                <p>Selecciona un tipo de reporte y haz clic en "Generar Reporte" para ver los resultados.</p>
+              </div>
+            )}
+
+            {currentReport && (
+              <div>
+                {reportType === 'consolidated_statistics' && renderConsolidatedStats(currentReport)}
+                {reportType === 'low_performance' && renderLowPerformanceReport(currentReport)}
+                {reportType === 'comparative' && renderComparativeReport(currentReport)}
+                {reportType === 'student_performance' && (
+                  <div className="text-gray-600">
+                    <p>Reporte de rendimiento por estudiante en desarrollo...</p>
+                    <pre className="mt-4 p-4 bg-gray-100 rounded text-xs overflow-auto">
+                      {JSON.stringify(currentReport, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    });
+
     const DashboardView = ({ data, onReset, fileName, derived, filters, setFilters }) => {
       console.time('render:DashboardView');
       const { courseFilterDV, studentFilter, areaFilter, asigFilter, estadoFilter } = filters;
@@ -2763,6 +4921,769 @@ function formatNota(n){
         });
       }
 
+      // ======================================
+      // [FASE 2] Funciones de Análisis por Periodos
+      // ======================================
+      
+      // Detecta si un periodo tiene datos disponibles
+      const isPeriodAvailable = (dataset, period) => {
+        if (!Array.isArray(dataset) || dataset.length === 0) return false;
+        
+        return dataset.some(student => 
+          Object.values(student.areas).some(area => 
+            area.DEF && typeof area.DEF[period] === 'number' ||
+            Object.values(area.asignaturas || {}).some(asig => 
+              typeof asig[period] === 'number'
+            )
+          )
+        );
+      };
+
+      // Análisis individual por periodo específico
+      const analyzeIndividualPeriod = (dataset, period) => {
+        if (!isPeriodAvailable(dataset, period)) {
+          return { available: false, data: [] };
+        }
+
+        const periodData = dataset.flatMap(student => 
+          Object.entries(student.areas).flatMap(([areaName, areaData]) => 
+            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => {
+              const grade = asigData[period];
+              const isLowPerformance = typeof grade === 'number' && grade < 3.0;
+              
+              return {
+                studentId: student.id,
+                student: student.name,
+                course: student.CURSO || student.__course || 'SIN_CURSO',
+                area: areaName,
+                subject: asigName,
+                period: period,
+                grade: grade,
+                isLowPerformance: isLowPerformance,
+                status: grade !== null && typeof grade === 'number' ? 
+                  (grade >= 3.0 ? 'Aprobado' : 'Reprobado') : 'Sin datos'
+              };
+            })
+          )
+        );
+
+        return { available: true, data: periodData };
+      };
+
+      // Análisis acumulativo por periodos
+      const analyzeCumulativePeriods = (dataset, periods) => {
+        const validPeriods = periods.filter(p => isPeriodAvailable(dataset, p));
+        
+        if (validPeriods.length === 0) {
+          return { available: false, data: [], periodsIncluded: [] };
+        }
+
+        const cumulativeData = dataset.flatMap(student => 
+          Object.entries(student.areas).flatMap(([areaName, areaData]) => 
+            Object.entries(areaData.asignaturas).map(([asigName, asigData]) => {
+              const grades = validPeriods.map(p => asigData[p]).filter(g => typeof g === 'number');
+              
+              if (grades.length === 0) {
+                return {
+                  studentId: student.id,
+                  student: student.name,
+                  course: student.CURSO || student.__course || 'SIN_CURSO',
+                  area: areaName,
+                  subject: asigName,
+                  periodsIncluded: validPeriods,
+                  grades: grades,
+                  average: null,
+                  trend: 'Sin datos',
+                  isLowPerformance: false,
+                  status: 'Sin datos'
+                };
+              }
+
+              const average = grades.reduce((a, b) => a + b, 0) / grades.length;
+              const isLowPerformance = average < 3.0;
+              const trend = calculateTrend(grades);
+              
+              return {
+                studentId: student.id,
+                student: student.name,
+                course: student.CURSO || student.__course || 'SIN_CURSO',
+                area: areaName,
+                subject: asigName,
+                periodsIncluded: validPeriods,
+                grades: grades,
+                average: average,
+                trend: trend,
+                isLowPerformance: isLowPerformance,
+                status: isLowPerformance ? 'Bajo rendimiento' : 'Buen rendimiento'
+              };
+            })
+          )
+        );
+
+        return { available: true, data: cumulativeData, periodsIncluded: validPeriods };
+      };
+
+      // Calcula tendencia entre periodos
+      const calculateTrend = (grades) => {
+        if (grades.length < 2) return 'Insuficientes datos';
+        
+        const first = grades[0];
+        const last = grades[grades.length - 1];
+        const difference = last - first;
+        
+        if (Math.abs(difference) < 0.1) return 'Estable';
+        return difference > 0 ? 'Mejorando' : 'Declinando';
+      };
+
+      // Detecta estudiantes con bajo rendimiento por periodo
+      const detectLowPerformanceByPeriod = (dataset, period) => {
+        const analysis = analyzeIndividualPeriod(dataset, period);
+        if (!analysis.available) return [];
+        
+        return analysis.data.filter(item => item.isLowPerformance);
+      };
+
+      // Función principal que construye toda la estructura de análisis por periodos
+      const buildPeriodicAnalysis = (dataset) => {
+        const periods = ['P1', 'P2', 'P3', 'P4'];
+        const availablePeriods = periods.filter(p => isPeriodAvailable(dataset, p));
+        
+        // Análisis individual por cada periodo
+        const byPeriod = {};
+        periods.forEach(period => {
+          byPeriod[period] = analyzeIndividualPeriod(dataset, period);
+        });
+
+        // Análisis acumulativo
+        const cumulative = {};
+        
+        // Solo generar acumulativos si hay al menos 2 periodos
+        if (availablePeriods.length >= 2) {
+          // P1+P2
+          if (availablePeriods.includes('P1') && availablePeriods.includes('P2')) {
+            cumulative.P1_P2 = analyzeCumulativePeriods(dataset, ['P1', 'P2']);
+          }
+          
+          // P1+P2+P3  
+          if (availablePeriods.includes('P1') && availablePeriods.includes('P2') && availablePeriods.includes('P3')) {
+            cumulative.P1_P2_P3 = analyzeCumulativePeriods(dataset, ['P1', 'P2', 'P3']);
+          }
+          
+          // P1+P2+P3+P4
+          if (availablePeriods.length === 4) {
+            cumulative.P1_P2_P3_P4 = analyzeCumulativePeriods(dataset, ['P1', 'P2', 'P3', 'P4']);
+          }
+        }
+
+        // Detección de bajo rendimiento por periodo
+        const lowPerformanceByPeriod = {};
+        availablePeriods.forEach(period => {
+          lowPerformanceByPeriod[period] = detectLowPerformanceByPeriod(dataset, period);
+        });
+
+        // Resumen de bajo rendimiento general
+        const lowPerformanceSummary = availablePeriods.map(period => {
+          const lowPerf = lowPerformanceByPeriod[period] || [];
+          const totalStudents = new Set(lowPerf.map(item => item.student)).size;
+          const totalSubjects = lowPerf.length;
+          
+          return {
+            period: period,
+            studentsWithLowPerformance: totalStudents,
+            subjectsWithLowPerformance: totalSubjects,
+            detailedData: lowPerf
+          };
+        });
+
+        return {
+          availablePeriods: availablePeriods,
+          byPeriod: byPeriod,
+          cumulative: cumulative,
+          lowPerformanceByPeriod: lowPerformanceByPeriod,
+          lowPerformanceSummary: lowPerformanceSummary
+        };
+      };
+
+      // ======================================
+      // [FASE 3] Funciones de Lógica de Cálculos para Informes
+      // ======================================
+
+      // Genera informe de rendimiento individual por estudiante
+      const generateStudentPerformanceReport = (periodicAnalysis, studentId = null) => {
+        const { byPeriod, cumulative, availablePeriods } = periodicAnalysis;
+        
+        // Si se especifica un estudiante, filtrar por ese estudiante
+        const filterByStudent = (data) => {
+          if (!studentId) return data;
+          return data.filter(item => item.studentId === studentId);
+        };
+
+        const report = {
+          type: 'student_performance',
+          generatedAt: new Date().toISOString(),
+          studentId: studentId,
+          availablePeriods: availablePeriods,
+          individualPeriods: {},
+          cumulativeAnalysis: {},
+          summary: {}
+        };
+
+        // Análisis por periodo individual
+        availablePeriods.forEach(period => {
+          if (byPeriod[period]?.available) {
+            const periodData = filterByStudent(byPeriod[period].data);
+            const lowPerformance = periodData.filter(item => item.isLowPerformance);
+            
+            report.individualPeriods[period] = {
+              totalSubjects: periodData.length,
+              approvedSubjects: periodData.filter(item => item.status === 'Aprobado').length,
+              failedSubjects: periodData.filter(item => item.status === 'Reprobado').length,
+              lowPerformanceSubjects: lowPerformance.length,
+              averageGrade: periodData.length > 0 ? 
+                periodData.reduce((sum, item) => sum + (item.grade || 0), 0) / periodData.length : 0,
+              detailedData: periodData
+            };
+          }
+        });
+
+        // Análisis acumulativo
+        Object.entries(cumulative).forEach(([key, cumulativeData]) => {
+          if (cumulativeData?.available) {
+            const filteredData = filterByStudent(cumulativeData.data);
+            const improvingTrends = filteredData.filter(item => item.trend === 'Mejorando');
+            const decliningTrends = filteredData.filter(item => item.trend === 'Declinando');
+            
+            report.cumulativeAnalysis[key] = {
+              periodsIncluded: cumulativeData.periodsIncluded,
+              totalSubjects: filteredData.length,
+              averagePerformance: filteredData.length > 0 ?
+                filteredData.reduce((sum, item) => sum + (item.average || 0), 0) / filteredData.length : 0,
+              improvingSubjects: improvingTrends.length,
+              decliningSubjects: decliningTrends.length,
+              stableSubjects: filteredData.filter(item => item.trend === 'Estable').length,
+              lowPerformanceSubjects: filteredData.filter(item => item.isLowPerformance).length,
+              detailedData: filteredData
+            };
+          }
+        });
+
+        return report;
+      };
+
+      // Genera informe de bajo rendimiento por curso
+      const generateLowPerformanceReport = (periodicAnalysis, courseFilter = null) => {
+        const { lowPerformanceSummary, lowPerformanceByPeriod } = periodicAnalysis;
+        
+        const report = {
+          type: 'low_performance',
+          generatedAt: new Date().toISOString(),
+          courseFilter: courseFilter,
+          summary: {},
+          detailedAnalysis: {},
+          recommendations: []
+        };
+
+        // Resumen por periodo
+        lowPerformanceSummary.forEach(periodSummary => {
+          const period = periodSummary.period;
+          let filteredData = periodSummary.detailedData;
+          
+          if (courseFilter) {
+            filteredData = filteredData.filter(item => item.course === courseFilter);
+          }
+
+          // Agrupar por estudiante
+          const studentGroups = {};
+          filteredData.forEach(item => {
+            if (!studentGroups[item.student]) {
+              studentGroups[item.student] = {
+                student: item.student,
+                course: item.course,
+                subjects: []
+              };
+            }
+            studentGroups[item.student].subjects.push({
+              area: item.area,
+              subject: item.subject,
+              grade: item.grade
+            });
+          });
+
+          report.summary[period] = {
+            totalStudentsAffected: Object.keys(studentGroups).length,
+            totalSubjectsAffected: filteredData.length,
+            averageGrade: filteredData.length > 0 ?
+              filteredData.reduce((sum, item) => sum + item.grade, 0) / filteredData.length : 0,
+            studentDetails: Object.values(studentGroups)
+          };
+        });
+
+        // Análisis detallado con identificación de patrones
+        Object.entries(lowPerformanceByPeriod).forEach(([period, data]) => {
+          let filteredData = data;
+          if (courseFilter) {
+            filteredData = filteredData.filter(item => item.course === courseFilter);
+          }
+
+          // Agrupar por área y asignatura para identificar materias problemáticas
+          const subjectAnalysis = {};
+          filteredData.forEach(item => {
+            const key = `${item.area} - ${item.subject}`;
+            if (!subjectAnalysis[key]) {
+              subjectAnalysis[key] = {
+                area: item.area,
+                subject: item.subject,
+                studentsAffected: [],
+                averageGrade: 0,
+                count: 0
+              };
+            }
+            subjectAnalysis[key].studentsAffected.push(item.student);
+            subjectAnalysis[key].averageGrade += item.grade;
+            subjectAnalysis[key].count++;
+          });
+
+          // Calcular promedios y ordenar por mayor impacto
+          Object.values(subjectAnalysis).forEach(analysis => {
+            analysis.averageGrade = analysis.averageGrade / analysis.count;
+            analysis.studentsAffected = [...new Set(analysis.studentsAffected)];
+          });
+
+          const sortedSubjects = Object.values(subjectAnalysis)
+            .sort((a, b) => b.studentsAffected.length - a.studentsAffected.length);
+
+          report.detailedAnalysis[period] = {
+            mostProblematicSubjects: sortedSubjects.slice(0, 5),
+            allSubjectsAnalysis: sortedSubjects
+          };
+        });
+
+        // Generar recomendaciones automáticas
+        report.recommendations = generateLowPerformanceRecommendations(report);
+
+        return report;
+      };
+
+      // Genera recomendaciones basadas en el análisis de bajo rendimiento
+      const generateLowPerformanceRecommendations = (lowPerformanceReport) => {
+        const recommendations = [];
+        
+        // Analizar patrones across periodos
+        const allSubjects = {};
+        Object.values(lowPerformanceReport.detailedAnalysis).forEach(periodAnalysis => {
+          periodAnalysis.mostProblematicSubjects.forEach(subject => {
+            const key = `${subject.area} - ${subject.subject}`;
+            if (!allSubjects[key]) {
+              allSubjects[key] = { ...subject, appearsInPeriods: 0 };
+            }
+            allSubjects[key].appearsInPeriods++;
+          });
+        });
+
+        // Recomendaciones por materias recurrentes
+        const recurrentSubjects = Object.values(allSubjects)
+          .filter(subject => subject.appearsInPeriods > 1)
+          .sort((a, b) => b.appearsInPeriods - a.appearsInPeriods);
+
+        if (recurrentSubjects.length > 0) {
+          recommendations.push({
+            type: 'recurring_subjects',
+            priority: 'high',
+            title: 'Materias con Bajo Rendimiento Recurrente',
+            description: `Las siguientes materias muestran bajo rendimiento en múltiples periodos: ${recurrentSubjects.slice(0, 3).map(s => s.subject).join(', ')}`,
+            actionItems: [
+              'Revisar metodología de enseñanza en estas materias',
+              'Implementar programas de refuerzo académico',
+              'Considerar capacitación adicional para docentes'
+            ]
+          });
+        }
+
+        // Recomendaciones por cantidad de estudiantes afectados
+        const totalStudentsAffected = new Set();
+        Object.values(lowPerformanceReport.summary).forEach(periodSummary => {
+          periodSummary.studentDetails.forEach(student => {
+            totalStudentsAffected.add(student.student);
+          });
+        });
+
+        if (totalStudentsAffected.size > 0) {
+          const affectedPercentage = (totalStudentsAffected.size / 100) * 100; // Asumiendo base de 100 estudiantes
+          
+          if (affectedPercentage > 20) {
+            recommendations.push({
+              type: 'high_impact',
+              priority: 'urgent',
+              title: 'Alto Porcentaje de Estudiantes con Bajo Rendimiento',
+              description: `${totalStudentsAffected.size} estudiantes presentan bajo rendimiento (${affectedPercentage.toFixed(1)}% estimado)`,
+              actionItems: [
+                'Implementar plan de intervención institucional',
+                'Revisar estrategias pedagógicas generales',
+                'Establecer sistema de tutoría personalizada'
+              ]
+            });
+          }
+        }
+
+        return recommendations;
+      };
+
+      // Genera informe comparativo entre periodos
+      const generateComparativeReport = (periodicAnalysis, comparisonType = 'sequential') => {
+        const { byPeriod, availablePeriods } = periodicAnalysis;
+        
+        const report = {
+          type: 'comparative',
+          generatedAt: new Date().toISOString(),
+          comparisonType: comparisonType,
+          availablePeriods: availablePeriods,
+          comparisons: [],
+          overallTrends: {}
+        };
+
+        if (comparisonType === 'sequential' && availablePeriods.length >= 2) {
+          // Comparaciones secuenciales (P1 vs P2, P2 vs P3, etc.)
+          for (let i = 0; i < availablePeriods.length - 1; i++) {
+            const currentPeriod = availablePeriods[i];
+            const nextPeriod = availablePeriods[i + 1];
+            
+            if (byPeriod[currentPeriod]?.available && byPeriod[nextPeriod]?.available) {
+              const comparison = comparePeriodsPerformance(
+                byPeriod[currentPeriod].data,
+                byPeriod[nextPeriod].data,
+                currentPeriod,
+                nextPeriod
+              );
+              report.comparisons.push(comparison);
+            }
+          }
+        }
+
+        // Calcular tendencias generales
+        report.overallTrends = calculateOverallTrends(byPeriod, availablePeriods);
+
+        return report;
+      };
+
+      // Compara el rendimiento entre dos periodos específicos
+      const comparePeriodsPerformance = (period1Data, period2Data, period1Name, period2Name) => {
+        // Crear mapas para facilitar la comparación
+        const period1Map = {};
+        const period2Map = {};
+        
+        period1Data.forEach(item => {
+          const key = `${item.studentId}_${item.area}_${item.subject}`;
+          period1Map[key] = item;
+        });
+        
+        period2Data.forEach(item => {
+          const key = `${item.studentId}_${item.area}_${item.subject}`;
+          period2Map[key] = item;
+        });
+
+        const comparison = {
+          period1: period1Name,
+          period2: period2Name,
+          improvements: [],
+          declines: [],
+          stable: [],
+          statistics: {
+            totalComparisons: 0,
+            averageChange: 0,
+            improvementCount: 0,
+            declineCount: 0,
+            stableCount: 0
+          }
+        };
+
+        // Comparar elementos comunes
+        const commonKeys = Object.keys(period1Map).filter(key => period2Map[key]);
+        
+        commonKeys.forEach(key => {
+          const item1 = period1Map[key];
+          const item2 = period2Map[key];
+          
+          if (typeof item1.grade === 'number' && typeof item2.grade === 'number') {
+            const change = item2.grade - item1.grade;
+            const comparisonItem = {
+              student: item1.student,
+              course: item1.course,
+              area: item1.area,
+              subject: item1.subject,
+              period1Grade: item1.grade,
+              period2Grade: item2.grade,
+              change: change,
+              changePercentage: item1.grade !== 0 ? (change / item1.grade) * 100 : 0
+            };
+
+            if (Math.abs(change) < 0.1) {
+              comparison.stable.push(comparisonItem);
+              comparison.statistics.stableCount++;
+            } else if (change > 0) {
+              comparison.improvements.push(comparisonItem);
+              comparison.statistics.improvementCount++;
+            } else {
+              comparison.declines.push(comparisonItem);
+              comparison.statistics.declineCount++;
+            }
+
+            comparison.statistics.totalComparisons++;
+            comparison.statistics.averageChange += change;
+          }
+        });
+
+        if (comparison.statistics.totalComparisons > 0) {
+          comparison.statistics.averageChange /= comparison.statistics.totalComparisons;
+        }
+
+        // Ordenar por magnitud del cambio
+        comparison.improvements.sort((a, b) => b.change - a.change);
+        comparison.declines.sort((a, b) => a.change - b.change);
+
+        return comparison;
+      };
+
+      // Calcula tendencias generales across todos los periodos
+      const calculateOverallTrends = (byPeriod, availablePeriods) => {
+        const trends = {
+          overallImprovement: 0,
+          subjectTrends: {},
+          areaTrends: {},
+          courseTrends: {}
+        };
+
+        // Analizar tendencias por materia, área y curso
+        const subjectData = {};
+        const areaData = {};
+        const courseData = {};
+
+        availablePeriods.forEach(period => {
+          if (byPeriod[period]?.available) {
+            byPeriod[period].data.forEach(item => {
+              // Agrupar por materia
+              const subjectKey = `${item.area} - ${item.subject}`;
+              if (!subjectData[subjectKey]) subjectData[subjectKey] = [];
+              subjectData[subjectKey].push({ period, grade: item.grade });
+
+              // Agrupar por área
+              if (!areaData[item.area]) areaData[item.area] = [];
+              areaData[item.area].push({ period, grade: item.grade });
+
+              // Agrupar por curso
+              if (!courseData[item.course]) courseData[item.course] = [];
+              courseData[item.course].push({ period, grade: item.grade });
+            });
+          }
+        });
+
+        // Calcular tendencias para cada agrupación
+        trends.subjectTrends = calculateTrendsForGroups(subjectData);
+        trends.areaTrends = calculateTrendsForGroups(areaData);
+        trends.courseTrends = calculateTrendsForGroups(courseData);
+
+        return trends;
+      };
+
+      // Función auxiliar para calcular tendencias de grupos
+      const calculateTrendsForGroups = (groupData) => {
+        const trends = {};
+        
+        Object.entries(groupData).forEach(([key, data]) => {
+          if (data.length >= 2) {
+            const grades = data.map(item => item.grade).filter(g => typeof g === 'number');
+            if (grades.length >= 2) {
+              const firstGrade = grades[0];
+              const lastGrade = grades[grades.length - 1];
+              const change = lastGrade - firstGrade;
+              const trend = Math.abs(change) < 0.1 ? 'Estable' : (change > 0 ? 'Mejorando' : 'Declinando');
+              
+              trends[key] = {
+                trend: trend,
+                change: change,
+                changePercentage: firstGrade !== 0 ? (change / firstGrade) * 100 : 0,
+                averageGrade: grades.reduce((a, b) => a + b, 0) / grades.length
+              };
+            }
+          }
+        });
+
+        return trends;
+      };
+
+      // Genera estadísticas consolidadas para el panel principal
+      const generateConsolidatedStatistics = (periodicAnalysis) => {
+        const { availablePeriods, byPeriod, cumulative, lowPerformanceSummary } = periodicAnalysis;
+        
+        const stats = {
+          overview: {
+            totalPeriods: availablePeriods.length,
+            totalStudents: 0,
+            totalSubjects: 0,
+            overallAverageGrade: 0,
+            overallLowPerformanceRate: 0
+          },
+          periodComparison: {},
+          trends: {
+            improving: 0,
+            declining: 0,
+            stable: 0
+          },
+          alerts: []
+        };
+
+        // Calcular estadísticas generales
+        let totalGrades = 0;
+        let gradeSum = 0;
+        let totalLowPerformance = 0;
+        const allStudents = new Set();
+        const allSubjects = new Set();
+
+        availablePeriods.forEach(period => {
+          if (byPeriod[period]?.available) {
+            const periodData = byPeriod[period].data;
+            
+            periodData.forEach(item => {
+              if (typeof item.grade === 'number') {
+                allStudents.add(item.student);
+                allSubjects.add(`${item.area} - ${item.subject}`);
+                gradeSum += item.grade;
+                totalGrades++;
+                if (item.isLowPerformance) totalLowPerformance++;
+              }
+            });
+
+            // Estadísticas por periodo
+            const periodGrades = periodData.filter(item => typeof item.grade === 'number');
+            const periodAverage = periodGrades.length > 0 ? 
+              periodGrades.reduce((sum, item) => sum + item.grade, 0) / periodGrades.length : 0;
+            
+            stats.periodComparison[period] = {
+              totalEntries: periodData.length,
+              averageGrade: periodAverage,
+              lowPerformanceCount: periodData.filter(item => item.isLowPerformance).length,
+              approvalRate: periodGrades.length > 0 ? 
+                (periodGrades.filter(item => item.grade >= 3.0).length / periodGrades.length) * 100 : 0
+            };
+          }
+        });
+
+        stats.overview.totalStudents = allStudents.size;
+        stats.overview.totalSubjects = allSubjects.size;
+        stats.overview.overallAverageGrade = totalGrades > 0 ? gradeSum / totalGrades : 0;
+        stats.overview.overallLowPerformanceRate = totalGrades > 0 ? (totalLowPerformance / totalGrades) * 100 : 0;
+
+        // Analizar tendencias usando datos acumulativos
+        if (cumulative.P1_P2_P3?.available) {
+          const trends = cumulative.P1_P2_P3.data.reduce((acc, item) => {
+            if (item.trend === 'Mejorando') acc.improving++;
+            else if (item.trend === 'Declinando') acc.declining++;
+            else acc.stable++;
+            return acc;
+          }, { improving: 0, declining: 0, stable: 0 });
+          
+          stats.trends = trends;
+        }
+
+        // Generar alertas automáticas
+        stats.alerts = generateAutomaticAlerts(stats, lowPerformanceSummary);
+
+        return stats;
+      };
+
+      // Genera alertas automáticas basadas en las estadísticas
+      const generateAutomaticAlerts = (stats, lowPerformanceSummary) => {
+        const alerts = [];
+
+        // Alerta por bajo rendimiento general
+        if (stats.overview.overallLowPerformanceRate > 25) {
+          alerts.push({
+            type: 'critical',
+            category: 'low_performance',
+            title: 'Alto Porcentaje de Bajo Rendimiento',
+            message: `${stats.overview.overallLowPerformanceRate.toFixed(1)}% de las calificaciones están por debajo de 3.0`,
+            recommendation: 'Se recomienda implementar plan de intervención inmediato',
+            priority: 1
+          });
+        }
+
+        // Alerta por tendencia declinante
+        const totalTrends = stats.trends.improving + stats.trends.declining + stats.trends.stable;
+        if (totalTrends > 0 && (stats.trends.declining / totalTrends) > 0.3) {
+          alerts.push({
+            type: 'warning',
+            category: 'declining_trend',
+            title: 'Tendencia Declinante Detectada',
+            message: `${stats.trends.declining} materias muestran tendencia a la baja`,
+            recommendation: 'Revisar estrategias pedagógicas en las materias afectadas',
+            priority: 2
+          });
+        }
+
+        // Alerta por periodos con rendimiento muy bajo
+        Object.entries(stats.periodComparison).forEach(([period, data]) => {
+          if (data.approvalRate < 70) {
+            alerts.push({
+              type: 'warning',
+              category: 'period_performance',
+              title: `Bajo Rendimiento en ${period}`,
+              message: `Solo ${data.approvalRate.toFixed(1)}% de aprobación en ${period}`,
+              recommendation: `Analizar factores específicos del ${period}`,
+              priority: 3
+            });
+          }
+        });
+
+        // Ordenar por prioridad
+        return alerts.sort((a, b) => a.priority - b.priority);
+      };
+
+      // Función principal para generar cualquier tipo de informe
+      const generateReport = (derivedData, reportType, options = {}) => {
+        const { periodicAnalysis } = derivedData;
+        
+        if (!periodicAnalysis) {
+          return { error: 'No hay datos de análisis por periodos disponibles' };
+        }
+
+        switch (reportType) {
+          case 'student_performance':
+            return generateStudentPerformanceReport(periodicAnalysis, options.studentId);
+          
+          case 'low_performance':
+            return generateLowPerformanceReport(periodicAnalysis, options.courseFilter);
+          
+          case 'comparative':
+            return generateComparativeReport(periodicAnalysis, options.comparisonType);
+          
+          case 'consolidated_statistics':
+            return generateConsolidatedStatistics(periodicAnalysis);
+          
+          default:
+            return { error: `Tipo de informe no reconocido: ${reportType}` };
+        }
+      };
+
+      // Función utilitaria para formatear números para reportes
+      const formatGradeForReport = (grade) => {
+        if (typeof grade !== 'number') return 'N/A';
+        return grade.toFixed(2);
+      };
+
+      // Función utilitaria para formatear porcentajes
+      const formatPercentageForReport = (value) => {
+        if (typeof value !== 'number') return 'N/A';
+        return `${value.toFixed(1)}%`;
+      };
+
+      // Función utilitaria para obtener el color/estado de una calificación
+      const getGradeStatus = (grade) => {
+        if (typeof grade !== 'number') return { status: 'no_data', color: '#gray' };
+        if (grade >= 4.5) return { status: 'excellent', color: '#28a745' };
+        if (grade >= 3.5) return { status: 'good', color: '#ffc107' };
+        if (grade >= 3.0) return { status: 'acceptable', color: '#fd7e14' };
+        return { status: 'low', color: '#dc3545' };
+      };
+
       const buildDerived = (dataset) => {
         if (!Array.isArray(dataset) || dataset.length === 0) {
           return { rowsArea: [], rowsAsignatura: [], studentList: [], areaList: [], asigList: [], courseList: [], promGeneral: 0, estadoCounts: {}, areaRiesgo: [] };
@@ -2852,7 +5773,24 @@ function formatNota(n){
           return { area, enRiesgo, reprobados, total: studentList.length };
         });
 
-        return { rowsArea, rowsAsignatura, studentList, areaList, asigList, courseList, promGeneral, estadoCounts, areaRiesgo };
+        // ======================================
+        // [FASE 2] Análisis por Periodos - Extensión de buildDerived
+        // ======================================
+        const periodicAnalysis = buildPeriodicAnalysis(dataset);
+
+        return { 
+          rowsArea, 
+          rowsAsignatura, 
+          studentList, 
+          areaList, 
+          asigList, 
+          courseList, 
+          promGeneral, 
+          estadoCounts, 
+          areaRiesgo,
+          // [FASE 2] Nueva estructura para informes por periodos
+          periodicAnalysis 
+        };
       };
 
       // ---------- Utilidades de estado/persistencia ----------

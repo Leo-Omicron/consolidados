@@ -8,6 +8,27 @@ Este proyecto es un **Dashboard Académico Institucional** interactivo diseñado
 
 La herramienta está construida como una aplicación web de una sola página (`Single Page Application`) y se ejecuta completamente en el navegador, sin necesidad de un servidor o conexión a internet una vez cargada.
 
+## 🆕 **Sistema de Informes por Periodos** *(NUEVO)*
+
+### 📊 **Funcionalidad Destacada**
+El dashboard ahora incluye un **Sistema Completo de Informes de Rendimiento Escolar por Periodos** que permite:
+
+- **📈 Análisis por Periodos**: Evaluación detallada de P1, P2, P3, P4 individual y acumulativa
+- **📊 Múltiples Tipos de Informes**: Rendimiento estudiantil, bajo rendimiento, análisis comparativo y estadísticas consolidadas
+- **📤 Exportación Profesional**: CSV, XLSX, PDF y JSON con plantillas institucionales
+- **🧪 Sistema de Validación**: Diagnósticos automáticos y pruebas de integridad completas
+- **⚡ Optimización Avanzada**: Algoritmos optimizados con indicadores de progreso en tiempo real
+- **🎨 Interfaz Moderna**: Diseño intuitivo con filtros avanzados y visualización profesional
+
+### 🚀 **Acceso Rápido**
+1. Ir a la pestaña **"📊 Informes"** en la navegación superior
+2. Seleccionar tipo de reporte deseado
+3. Aplicar filtros según necesidades
+4. Generar y exportar resultados
+
+📋 **Documentación Completa**: [DOCUMENTACION_SISTEMA_INFORMES.md](DOCUMENTACION_SISTEMA_INFORMES.md)  
+⚡ **Guía Rápida**: [GUIA_RAPIDA_INFORMES.md](GUIA_RAPIDA_INFORMES.md)
+
 ## Características Principales
 
 ### 🎯 **Gestión de Datos Avanzada**
@@ -23,20 +44,24 @@ La herramienta está construida como una aplicación web de una sola página (`S
 -   **Gráficos Interactivos:** Chart.js con exportación PNG y sincronización con filtros
 -   **KPIs Dinámicos:** Indicadores en tiempo real que responden a filtros aplicados
 -   **Sistema de Estados:** Clasificación automática (Ganado, Ganable, Recuperable, En Riesgo, Perdido)
+-   **📊 Informes por Periodos:** Sistema completo de análisis académico temporal **(NUEVO)**
 
 ### 🔧 **Funcionalidades Avanzadas**
 
 -   **Backup/Restore:** Sistema completo de exportación/importación JSON de estado
 -   **Exportación Multi-formato:** CSV para tablas, PNG para gráficos, JSON para backups
+-   **📤 Exportación Profesional:** Sistema avanzado de informes con plantillas institucionales **(NUEVO)**
 -   **Modo Desarrollo/Producción:** Switch automático con `?mode=dev/prod`
 -   **Filtros Persistentes:** Configuraciones guardadas en localStorage
 -   **Consultas Rápidas:** Reportes automáticos para identificación de riesgos académicos
+-   **🧪 Sistema de Validación:** Diagnósticos automáticos y herramientas de debugging **(NUEVO)**
 
 ### ♿ **Accesibilidad y UX**
 
 -   **Navegación Accesible:** Soporte completo de teclado y ARIA
 -   **Responsive Design:** Optimizado para escritorio, tablet y móvil
 -   **Loading Inteligente:** Fases de procesamiento con feedback visual
+-   **⚡ Indicadores de Progreso:** Barras de progreso en tiempo real para operaciones largas **(NUEVO)**
 -   **Error Boundaries:** Recuperación automática de errores sin pérdida de datos
 -   **Filtros de Ruido:** Silencia errores de extensiones externas automáticamente
 
@@ -47,7 +72,7 @@ La herramienta está construida como una aplicación web de una sola página (`S
 -   **JavaScript (ES6+)** con módulos ES y programación funcional
 -   **React.js 18.2.0** para interfaz de usuario reactiva con hooks avanzados
 -   **Chart.js 4.4.4** para gráficos interactivos con exportación PNG
--   **SheetJS (xlsx) 0.18.5** para procesamiento robusto de archivos Excel
+-   **SheetJS (xlsx) 0.18.5** para procesamiento robusto de archivos Excel y exportación avanzada
 -   **Babel Standalone** para transpilación JSX en tiempo real
 -   **Sistema de Estados Derivados** para optimización de performance
 -   **Persistencia en localStorage** para mantener configuraciones del usuario
