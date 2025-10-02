@@ -8,19 +8,21 @@ Este proyecto es un **Dashboard Académico Institucional** interactivo diseñado
 
 La herramienta está construida como una aplicación web de una sola página (`Single Page Application`) y se ejecuta completamente en el navegador, sin necesidad de un servidor o conexión a internet una vez cargada.
 
-## 🆕 **Sistema de Informes por Periodos** *(NUEVO)*
+## 🆕 **Sistema de Informes por Periodos** _(NUEVO)_
 
 ### 📊 **Funcionalidad Destacada**
+
 El dashboard ahora incluye un **Sistema Completo de Informes de Rendimiento Escolar por Periodos** que permite:
 
-- **📈 Análisis por Periodos**: Evaluación detallada de P1, P2, P3, P4 individual y acumulativa
-- **📊 Múltiples Tipos de Informes**: Rendimiento estudiantil, bajo rendimiento, análisis comparativo y estadísticas consolidadas
-- **📤 Exportación Profesional**: CSV, XLSX, PDF y JSON con plantillas institucionales
-- **🧪 Sistema de Validación**: Diagnósticos automáticos y pruebas de integridad completas
-- **⚡ Optimización Avanzada**: Algoritmos optimizados con indicadores de progreso en tiempo real
-- **🎨 Interfaz Moderna**: Diseño intuitivo con filtros avanzados y visualización profesional
+-   **📈 Análisis por Periodos**: Evaluación detallada de P1, P2, P3, P4 individual y acumulativa
+-   **📊 Múltiples Tipos de Informes**: Rendimiento estudiantil, bajo rendimiento, análisis comparativo y estadísticas consolidadas
+-   **📤 Exportación Profesional**: CSV, XLSX, PDF y JSON con plantillas institucionales
+-   **🧪 Sistema de Validación**: Diagnósticos automáticos y pruebas de integridad completas
+-   **⚡ Optimización Avanzada**: Algoritmos optimizados con indicadores de progreso en tiempo real
+-   **🎨 Interfaz Moderna**: Diseño intuitivo con filtros avanzados y visualización profesional
 
 ### 🚀 **Acceso Rápido**
+
 1. Ir a la pestaña **"📊 Informes"** en la navegación superior
 2. Seleccionar tipo de reporte deseado
 3. Aplicar filtros según necesidades

@@ -6,12 +6,12 @@ El **Sistema de Informes de Rendimiento Escolar por Periodos** es una funcionali
 
 ### ✨ Características Principales
 
-- 📈 **Análisis por Periodos**: Evaluación individual y acumulativa de P1 a P4
-- 📊 **Múltiples Tipos de Informes**: Rendimiento estudiantil, bajo rendimiento, comparativos y estadísticas consolidadas
-- 📤 **Exportación Multi-formato**: CSV, XLSX, PDF y JSON con plantillas profesionales
-- 🔍 **Sistema de Validación**: Diagnósticos automáticos y pruebas de integridad
-- ⚡ **Optimización de Rendimiento**: Algoritmos optimizados con indicadores de progreso
-- 🎨 **Interfaz Intuitiva**: Diseño moderno con filtros avanzados y visualización clara
+-   📈 **Análisis por Periodos**: Evaluación individual y acumulativa de P1 a P4
+-   📊 **Múltiples Tipos de Informes**: Rendimiento estudiantil, bajo rendimiento, comparativos y estadísticas consolidadas
+-   📤 **Exportación Multi-formato**: CSV, XLSX, PDF y JSON con plantillas profesionales
+-   🔍 **Sistema de Validación**: Diagnósticos automáticos y pruebas de integridad
+-   ⚡ **Optimización de Rendimiento**: Algoritmos optimizados con indicadores de progreso
+-   🎨 **Interfaz Intuitiva**: Diseño moderno con filtros avanzados y visualización clara
 
 ---
 
@@ -65,47 +65,53 @@ Sistema de Informes/
 ### 2️⃣ **Tipos de Informes Disponibles**
 
 #### 📈 **Rendimiento por Estudiante**
-- **Propósito**: Análisis detallado del rendimiento individual
-- **Uso**: Seleccionar un estudiante específico o "Todos los estudiantes"
-- **Contenido**: Notas por periodo, promedios, tendencias y recomendaciones
+
+-   **Propósito**: Análisis detallado del rendimiento individual
+-   **Uso**: Seleccionar un estudiante específico o "Todos los estudiantes"
+-   **Contenido**: Notas por periodo, promedios, tendencias y recomendaciones
 
 #### ⚠️ **Estudiantes con Bajo Rendimiento**
-- **Propósito**: Identificar estudiantes que requieren atención especial
-- **Uso**: Filtrar por curso específico o todos los cursos
-- **Contenido**: Lista de estudiantes con promedio < 3.0 o ≥2 materias reprobadas
+
+-   **Propósito**: Identificar estudiantes que requieren atención especial
+-   **Uso**: Filtrar por curso específico o todos los cursos
+-   **Contenido**: Lista de estudiantes con promedio < 3.0 o ≥2 materias reprobadas
 
 #### 📊 **Análisis Comparativo**
-- **Propósito**: Comparar rendimiento entre periodos
-- **Uso**: Seleccionar tipo de comparación (secuencial o específica)
-- **Contenido**: Tendencias, cambios porcentuales y análisis de mejora/deterioro
+
+-   **Propósito**: Comparar rendimiento entre periodos
+-   **Uso**: Seleccionar tipo de comparación (secuencial o específica)
+-   **Contenido**: Tendencias, cambios porcentuales y análisis de mejora/deterioro
 
 #### 🎯 **Estadísticas Consolidadas**
-- **Propósito**: Visión general del rendimiento institucional
-- **Uso**: Se genera automáticamente al cargar la pestaña
-- **Contenido**: Promedios generales, estadísticas por materia y distribución de notas
+
+-   **Propósito**: Visión general del rendimiento institucional
+-   **Uso**: Se genera automáticamente al cargar la pestaña
+-   **Contenido**: Promedios generales, estadísticas por materia y distribución de notas
 
 ### 3️⃣ **Filtros y Opciones Avanzadas**
 
 #### 🎯 **Filtros Disponibles**
-- **Por Estudiante**: Selección individual o todos los estudiantes
-- **Por Curso**: Filtrado por curso específico o todos los cursos
-- **Por Tipo de Comparación**: Secuencial (P1→P2→P3→P4) o específica
+
+-   **Por Estudiante**: Selección individual o todos los estudiantes
+-   **Por Curso**: Filtrado por curso específico o todos los cursos
+-   **Por Tipo de Comparación**: Secuencial (P1→P2→P3→P4) o específica
 
 #### ⚙️ **Opciones de Configuración**
-- **Auto-generación**: Los informes se actualizan automáticamente al cambiar filtros
-- **Validación en tiempo real**: Verificación automática de datos disponibles
-- **Optimización de rendimiento**: Algoritmos optimizados para datasets grandes
+
+-   **Auto-generación**: Los informes se actualizan automáticamente al cambiar filtros
+-   **Validación en tiempo real**: Verificación automática de datos disponibles
+-   **Optimización de rendimiento**: Algoritmos optimizados para datasets grandes
 
 ### 4️⃣ **Exportación de Reportes**
 
 #### 📂 **Formatos Disponibles**
 
-| Formato | Descripción | Uso Recomendado |
-|---------|-------------|-----------------|
-| **CSV** | Datos tabulares simples | Análisis en Excel/Google Sheets |
-| **XLSX** | Hoja de cálculo con formato | Reportes profesionales |
-| **PDF** | Documento imprimible | Presentaciones y archivo |
-| **JSON** | Datos estructurados | Integración con otros sistemas |
+| Formato  | Descripción                 | Uso Recomendado                 |
+| -------- | --------------------------- | ------------------------------- |
+| **CSV**  | Datos tabulares simples     | Análisis en Excel/Google Sheets |
+| **XLSX** | Hoja de cálculo con formato | Reportes profesionales          |
+| **PDF**  | Documento imprimible        | Presentaciones y archivo        |
+| **JSON** | Datos estructurados         | Integración con otros sistemas  |
 
 #### 💾 **Proceso de Exportación**
 
@@ -116,10 +122,10 @@ Sistema de Informes/
 
 #### 🎨 **Plantillas Profesionales**
 
-- **Encabezados institucionales** con logo y datos de la institución
-- **Formato profesional** con colores y tipografía consistente
-- **Metadatos completos** incluyendo fecha de generación y filtros aplicados
-- **Tablas formateadas** con estilos apropiados para cada formato
+-   **Encabezados institucionales** con logo y datos de la institución
+-   **Formato profesional** con colores y tipografía consistente
+-   **Metadatos completos** incluyendo fecha de generación y filtros aplicados
+-   **Tablas formateadas** con estilos apropiados para cada formato
 
 ---
 
@@ -130,9 +136,11 @@ Sistema de Informes/
 Función principal que procesa los datos y genera el análisis por periodos.
 
 **Parámetros:**
-- `dataset`: Array de objetos con datos estudiantiles
+
+-   `dataset`: Array de objetos con datos estudiantiles
 
 **Retorna:**
+
 ```javascript
 {
   availablePeriods: ['P1', 'P2', 'P3', 'P4'],  // Periodos disponibles
@@ -154,28 +162,34 @@ Función principal que procesa los datos y genera el análisis por periodos.
 Genera informes específicos basados en el análisis de datos.
 
 **Parámetros:**
-- `derivedData`: Datos procesados por buildDerived
-- `reportType`: Tipo de reporte ('student_performance', 'low_performance', etc.)
-- `options`: Opciones adicionales (filtros, configuraciones)
+
+-   `derivedData`: Datos procesados por buildDerived
+-   `reportType`: Tipo de reporte ('student_performance', 'low_performance', etc.)
+-   `options`: Opciones adicionales (filtros, configuraciones)
 
 **Tipos de Reporte:**
-- `'student_performance'`: Rendimiento por estudiante
-- `'low_performance'`: Estudiantes con bajo rendimiento
-- `'comparative'`: Análisis comparativo
-- `'consolidated_statistics'`: Estadísticas consolidadas
+
+-   `'student_performance'`: Rendimiento por estudiante
+-   `'low_performance'`: Estudiantes con bajo rendimiento
+-   `'comparative'`: Análisis comparativo
+-   `'consolidated_statistics'`: Estadísticas consolidadas
 
 ### 📤 **Funciones de Exportación**
 
 #### **exportReportToExcel(report, filename)**
+
 Exporta reportes a formato XLSX con formato profesional.
 
 #### **exportReportToPDF(report, filename)**
+
 Genera PDFs con plantillas institucionales.
 
 #### **exportReportToCSV(data, filename)**
+
 Exporta datos tabulares a formato CSV.
 
 #### **exportReportToJSON(report, filename)**
+
 Exporta estructura completa de datos en JSON.
 
 ---
@@ -189,40 +203,44 @@ El sistema incluye un panel completo de diagnósticos accesible desde la interfa
 #### **Funciones de Validación:**
 
 1. **🧪 Ejecutar Validación Completa**
-   - Ejecuta todas las pruebas de integridad
-   - Valida cálculos y estructuras de datos
-   - Muestra resultados en la interfaz
+
+    - Ejecuta todas las pruebas de integridad
+    - Valida cálculos y estructuras de datos
+    - Muestra resultados en la interfaz
 
 2. **🖥️ Ejecutar en Consola**
-   - Ejecuta validaciones en la consola del navegador
-   - Proporciona información detallada para desarrolladores
-   - Útil para debugging y análisis técnico
+
+    - Ejecuta validaciones en la consola del navegador
+    - Proporciona información detallada para desarrolladores
+    - Útil para debugging y análisis técnico
 
 3. **🎯 Probar con Datos Simulados**
-   - Genera datos de prueba automatizados
-   - Valida el sistema con datasets controlados
-   - Verifica funcionalidad sin afectar datos reales
+    - Genera datos de prueba automatizados
+    - Valida el sistema con datasets controlados
+    - Verifica funcionalidad sin afectar datos reales
 
 #### **Métricas Mostradas:**
 
-- ✅ **Pruebas Exitosas**: Número de validaciones que pasaron
-- ❌ **Pruebas Fallidas**: Número de validaciones que fallaron
-- ⚠️ **Advertencias**: Problemas menores detectados
-- 🚨 **Errores Críticos**: Problemas que requieren atención inmediata
-- ⚡ **Rendimiento**: Tiempo de ejecución de operaciones críticas
-- 📤 **Estado de Exportación**: Funcionalidad de cada formato de exportación
+-   ✅ **Pruebas Exitosas**: Número de validaciones que pasaron
+-   ❌ **Pruebas Fallidas**: Número de validaciones que fallaron
+-   ⚠️ **Advertencias**: Problemas menores detectados
+-   🚨 **Errores Críticos**: Problemas que requieren atención inmediata
+-   ⚡ **Rendimiento**: Tiempo de ejecución de operaciones críticas
+-   📤 **Estado de Exportación**: Funcionalidad de cada formato de exportación
 
 ### 🎯 **Interpretación de Resultados**
 
 #### **Códigos de Color:**
-- 🟢 **Verde**: Funcionamiento óptimo (< 100ms)
-- 🟡 **Amarillo**: Funcionamiento aceptable (100-300ms)
-- 🔴 **Rojo**: Requiere optimización (> 300ms)
+
+-   🟢 **Verde**: Funcionamiento óptimo (< 100ms)
+-   🟡 **Amarillo**: Funcionamiento aceptable (100-300ms)
+-   🔴 **Rojo**: Requiere optimización (> 300ms)
 
 #### **Acciones Recomendadas:**
-- **Pruebas fallidas**: Revisar estructura de datos y algoritmos
-- **Rendimiento lento**: Optimizar queries y reducir complejidad
-- **Errores de exportación**: Verificar bibliotecas y permisos
+
+-   **Pruebas fallidas**: Revisar estructura de datos y algoritmos
+-   **Rendimiento lento**: Optimizar queries y reducir complejidad
+-   **Errores de exportación**: Verificar bibliotecas y permisos
 
 ---
 
@@ -237,19 +255,19 @@ El sistema incluye un panel completo de diagnósticos accesible desde la interfa
 
 ### 📊 **Métricas de Rendimiento**
 
-| Operación | Tiempo Esperado | Umbral Crítico |
-|-----------|----------------|----------------|
-| `buildPeriodicAnalysis` | < 50ms | 150ms |
-| `generateReport` | < 30ms | 100ms |
-| `exportToExcel` | < 200ms | 500ms |
-| `validateSystem` | < 100ms | 300ms |
+| Operación               | Tiempo Esperado | Umbral Crítico |
+| ----------------------- | --------------- | -------------- |
+| `buildPeriodicAnalysis` | < 50ms          | 150ms          |
+| `generateReport`        | < 30ms          | 100ms          |
+| `exportToExcel`         | < 200ms         | 500ms          |
+| `validateSystem`        | < 100ms         | 300ms          |
 
 ### 🎯 **Indicadores de Progreso**
 
-- **Barra de Progreso Visual**: Muestra el porcentaje de completitud
-- **Descripción de Pasos**: Información en tiempo real del proceso actual
-- **Estadísticas de Generación**: Tiempo transcurrido y puntos de datos procesados
-- **Historial de Generación**: Registro de la última ejecución exitosa
+-   **Barra de Progreso Visual**: Muestra el porcentaje de completitud
+-   **Descripción de Pasos**: Información en tiempo real del proceso actual
+-   **Estadísticas de Generación**: Tiempo transcurrido y puntos de datos procesados
+-   **Historial de Generación**: Registro de la última ejecución exitosa
 
 ---
 
@@ -258,37 +276,46 @@ El sistema incluye un panel completo de diagnósticos accesible desde la interfa
 ### 🔧 **Problemas Comunes y Soluciones**
 
 #### **1. Reporte no se genera**
+
 **Síntomas**: El botón permanece deshabilitado o no responde
 **Causas posibles**:
-- Datos no cargados correctamente
-- Estructura de datos incorrecta
-- Error en la función buildDerived
+
+-   Datos no cargados correctamente
+-   Estructura de datos incorrecta
+-   Error en la función buildDerived
 
 **Solución**:
+
 1. Verificar que los datos estén cargados en `dashboardData`
 2. Ejecutar validación completa desde el panel de diagnósticos
 3. Revisar la consola del navegador para errores
 
 #### **2. Exportación falla**
+
 **Síntomas**: Error al descargar archivos o archivos corruptos
 **Causas posibles**:
-- Biblioteca XLSX no cargada
-- Datos demasiado grandes
-- Problemas de permisos del navegador
+
+-   Biblioteca XLSX no cargada
+-   Datos demasiado grandes
+-   Problemas de permisos del navegador
 
 **Solución**:
+
 1. Verificar que la biblioteca XLSX esté cargada
 2. Probar con datos más pequeños
 3. Verificar configuración de descargas del navegador
 
 #### **3. Rendimiento lento**
+
 **Síntomas**: Generación de reportes toma más de 5 segundos
 **Causas posibles**:
-- Dataset muy grande (>1000 estudiantes)
-- Navegador con recursos limitados
-- Algoritmos no optimizados
+
+-   Dataset muy grande (>1000 estudiantes)
+-   Navegador con recursos limitados
+-   Algoritmos no optimizados
 
 **Solución**:
+
 1. Ejecutar benchmark de rendimiento
 2. Filtrar datos antes de generar reportes
 3. Cerrar otras pestañas del navegador
@@ -296,6 +323,7 @@ El sistema incluye un panel completo de diagnósticos accesible desde la interfa
 ### 🔍 **Herramientas de Debugging**
 
 #### **Console Commands:**
+
 ```javascript
 // Validar sistema completo
 validatePeriodicReportsSystem(dashboardData, derived);
@@ -307,11 +335,12 @@ const testData = generateTestData();
 benchmarkPerformance(dashboardData, derived);
 
 // Verificar estructura de datos
-console.log('Dashboard Data:', dashboardData);
-console.log('Derived Data:', derived);
+console.log("Dashboard Data:", dashboardData);
+console.log("Derived Data:", derived);
 ```
 
 #### **Verificación Manual:**
+
 1. **F12** → Abrir herramientas de desarrollador
 2. **Consola** → Ejecutar comandos de debugging
 3. **Network** → Verificar carga de recursos
@@ -324,33 +353,37 @@ console.log('Derived Data:', derived);
 ### ✅ **Checklist de Funcionamiento**
 
 #### **Antes de Usar el Sistema:**
-- [ ] Dashboard carga correctamente
-- [ ] Datos estudiantiles están disponibles
-- [ ] Pestaña "Informes" es accesible
-- [ ] Panel de diagnósticos funciona
+
+-   [ ] Dashboard carga correctamente
+-   [ ] Datos estudiantiles están disponibles
+-   [ ] Pestaña "Informes" es accesible
+-   [ ] Panel de diagnósticos funciona
 
 #### **Validación de Funcionalidades:**
-- [ ] Generación de reporte de rendimiento estudiantil
-- [ ] Generación de reporte de bajo rendimiento
-- [ ] Generación de análisis comparativo
-- [ ] Generación de estadísticas consolidadas
-- [ ] Exportación a CSV funciona
-- [ ] Exportación a XLSX funciona
-- [ ] Exportación a PDF funciona
-- [ ] Exportación a JSON funciona
+
+-   [ ] Generación de reporte de rendimiento estudiantil
+-   [ ] Generación de reporte de bajo rendimiento
+-   [ ] Generación de análisis comparativo
+-   [ ] Generación de estadísticas consolidadas
+-   [ ] Exportación a CSV funciona
+-   [ ] Exportación a XLSX funciona
+-   [ ] Exportación a PDF funciona
+-   [ ] Exportación a JSON funciona
 
 #### **Pruebas de Filtros:**
-- [ ] Filtro por estudiante específico
-- [ ] Filtro por curso específico
-- [ ] Filtro "Todos los estudiantes"
-- [ ] Filtro "Todos los cursos"
-- [ ] Cambio de tipo de comparación
+
+-   [ ] Filtro por estudiante específico
+-   [ ] Filtro por curso específico
+-   [ ] Filtro "Todos los estudiantes"
+-   [ ] Filtro "Todos los cursos"
+-   [ ] Cambio de tipo de comparación
 
 #### **Validación de Datos:**
-- [ ] Promedios calculados correctamente
-- [ ] Detección de bajo rendimiento precisa
-- [ ] Estadísticas por materia correctas
-- [ ] Tendencias por periodo coherentes
+
+-   [ ] Promedios calculados correctamente
+-   [ ] Detección de bajo rendimiento precisa
+-   [ ] Estadísticas por materia correctas
+-   [ ] Tendencias por periodo coherentes
 
 ---
 
@@ -361,6 +394,7 @@ console.log('Derived Data:', derived);
 **Objetivo**: Preparar informes individuales para entregar a padres de familia.
 
 **Pasos**:
+
 1. Ir a la pestaña "Informes"
 2. Seleccionar "Rendimiento por Estudiante"
 3. Elegir estudiante específico
@@ -375,6 +409,7 @@ console.log('Derived Data:', derived);
 **Objetivo**: Presentar estadísticas generales de la institución.
 
 **Pasos**:
+
 1. Ir a la pestaña "Informes"
 2. El sistema auto-genera "Estadísticas Consolidadas"
 3. Revisar promedios generales y por materia
@@ -388,6 +423,7 @@ console.log('Derived Data:', derived);
 **Objetivo**: Identificar estudiantes que requieren apoyo adicional.
 
 **Pasos**:
+
 1. Ir a la pestaña "Informes"
 2. Seleccionar "Estudiantes con Bajo Rendimiento"
 3. Filtrar por curso específico si es necesario
@@ -402,6 +438,7 @@ console.log('Derived Data:', derived);
 **Objetivo**: Evaluar el progreso académico a lo largo del año.
 
 **Pasos**:
+
 1. Ir a la pestaña "Informes"
 2. Seleccionar "Análisis Comparativo"
 3. Configurar comparación secuencial
@@ -418,32 +455,36 @@ console.log('Derived Data:', derived);
 ### 📅 **Historial de Versiones**
 
 #### **Versión 1.0 (Actual)**
-- ✅ Implementación completa del sistema base
-- ✅ Cuatro tipos de informes principales
-- ✅ Exportación multi-formato
-- ✅ Sistema de validación completo
-- ✅ Optimizaciones de rendimiento
-- ✅ Interfaz de usuario completa
+
+-   ✅ Implementación completa del sistema base
+-   ✅ Cuatro tipos de informes principales
+-   ✅ Exportación multi-formato
+-   ✅ Sistema de validación completo
+-   ✅ Optimizaciones de rendimiento
+-   ✅ Interfaz de usuario completa
 
 #### **Futuras Mejoras Planificadas**
-- 📱 Versión móvil responsiva
-- 📧 Envío automático de reportes por email
-- 📊 Gráficos interactivos avanzados
-- 🔗 Integración con sistemas externos
-- 🤖 Análisis predictivo con IA
-- 📋 Plantillas personalizables
+
+-   📱 Versión móvil responsiva
+-   📧 Envío automático de reportes por email
+-   📊 Gráficos interactivos avanzados
+-   🔗 Integración con sistemas externos
+-   🤖 Análisis predictivo con IA
+-   📋 Plantillas personalizables
 
 ### 🔧 **Consideraciones Técnicas**
 
 #### **Compatibilidad:**
-- **Navegadores**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
-- **Bibliotecas**: React 18.2.0, XLSX 0.18.5
-- **Resolución**: Optimizado para 1920x1080, funcional desde 1366x768
+
+-   **Navegadores**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+-   **Bibliotecas**: React 18.2.0, XLSX 0.18.5
+-   **Resolución**: Optimizado para 1920x1080, funcional desde 1366x768
 
 #### **Limitaciones Conocidas:**
-- Máximo recomendado: 1000 estudiantes por reporte
-- Tiempo máximo de generación: 30 segundos
-- Tamaño máximo de archivo exportado: 50MB
+
+-   Máximo recomendado: 1000 estudiantes por reporte
+-   Tiempo máximo de generación: 30 segundos
+-   Tamaño máximo de archivo exportado: 50MB
 
 ---
 
@@ -452,26 +493,30 @@ console.log('Derived Data:', derived);
 ### 🆘 **Obtener Ayuda**
 
 #### **Soporte Técnico:**
+
 1. **Documentación**: Consultar esta documentación completa
 2. **Diagnósticos**: Usar el panel de diagnósticos integrado
 3. **Console Debugging**: Usar herramientas de desarrollador
 4. **Validación Automática**: Ejecutar pruebas del sistema
 
 #### **Reportar Problemas:**
+
 Cuando reporten problemas, incluir:
-- Tipo de navegador y versión
-- Pasos para reproducir el problema
-- Mensaje de error (si aplica)
-- Resultados de diagnósticos del sistema
-- Tamaño aproximado del dataset
+
+-   Tipo de navegador y versión
+-   Pasos para reproducir el problema
+-   Mensaje de error (si aplica)
+-   Resultados de diagnósticos del sistema
+-   Tamaño aproximado del dataset
 
 ### 📝 **Registro de Cambios**
 
 El sistema mantiene un registro automático de:
-- Tiempo de generación de reportes
-- Tipos de reportes más utilizados
-- Errores y advertencias del sistema
-- Métricas de rendimiento por sesión
+
+-   Tiempo de generación de reportes
+-   Tipos de reportes más utilizados
+-   Errores y advertencias del sistema
+-   Métricas de rendimiento por sesión
 
 ---
 
@@ -483,6 +528,6 @@ La implementación modular y la documentación exhaustiva garantizan que el sist
 
 ---
 
-*📅 Documento generado automáticamente - Versión 1.0*  
-*🏫 IE El Carmen - Sistema de Gestión Académica*  
-*📊 Sistema de Informes de Rendimiento Escolar por Periodos*
+_📅 Documento generado automáticamente - Versión 1.0_  
+_🏫 IE El Carmen - Sistema de Gestión Académica_  
+_📊 Sistema de Informes de Rendimiento Escolar por Periodos_
