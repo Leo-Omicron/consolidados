@@ -1,0 +1,41 @@
+Persisten inconsistencias y errores en el Sistema de Informes por Periodos:
+
+1. El sistema no reconoce las notas previamente cargadas para habilitar el botón **"Generar Reporte"**, el cual permanece desactivado (gris). Solo se activa al vaciar la memoria y recargar manualmente un archivo Excel, lo cual no debería ser necesario, ya que las notas se mantienen persistentes en otros paneles incluso tras recargar la página.
+
+2. Al ingresar al panel de Informes por Periodos se genera automáticamente un reporte (aparentemente de **Estadísticas Consolidadas**, ya que es el tipo de reporte predeterminado), aunque este no debería generarse sin acción del usuario. Finalmente, no se produce ningún resultado válido: en la sección 📋 **Resultados del Reporte** aparece en rojo el error:
+
+   ```
+   Error: generateReport debe ser llamada desde el contexto correcto
+   ```
+
+3. Si se cambia el tipo de reporte, por ejemplo: **Rendimiento por estudiante → Estudiante: Todos los estudiantes**, al presionar "Generar Reporte" aparece en la zona de resultados el mensaje:
+
+   ```
+   Reporte de rendimiento por estudiante en desarrollo...
+   {
+     "error": "generateReport debe ser llamada desde el contexto correcto",
+     "fallbackMessage": "Esta función está siendo llamada fuera de contexto"
+   }
+   ```
+
+4. En la sección de **Diagnóstico del sistema**, al ejecutar la validación completa se obtiene:
+
+   ```
+   ❌ Error en Diagnósticos
+   ```
+
+   Y al probar con datos simulados se registran los siguientes errores de consola:
+
+   * `Uncaught ReferenceError: formatGradeForReport is not defined`
+   * `Uncaught ReferenceError: buildDerived is not defined`
+   * Errores relacionados con `generateReport` siendo llamada fuera de contexto.
+
+5. Para el resto de tipos de reporte, los errores son similares y bloquean la funcionalidad.
+
+👉 Revisa, analiza y corrige estos problemas asegurando que:
+
+* El sistema detecte automáticamente las notas previamente cargadas sin necesidad de recargar archivos.
+* El botón **"Generar Reporte"** se habilite cuando existan datos válidos.
+* No se generen reportes automáticamente al ingresar al panel.
+* Todas las funciones (`generateReport`, `formatGradeForReport`, `buildDerived`, etc.) estén correctamente definidas y ejecutadas en el contexto adecuado.
+* La generación de reportes funcione de forma estable para todos los tipos de reporte disponibles.
